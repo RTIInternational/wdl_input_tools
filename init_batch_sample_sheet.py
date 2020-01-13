@@ -55,7 +55,7 @@ def get_argparser():
                                action='count',
                                dest='verbosity_level',
                                required=False,
-                               default=0,
+                               default=2,
                                help="Increase verbosity of the program."
                                     "Multiple -v's increase the verbosity level:\n"
                                     "0 = Errors\n"
@@ -94,6 +94,8 @@ def main():
     wdl.init_sample_sheet_file(wdl_template,
                                ss_output,
                                optional_cols=optional_cols)
+
+    logging.info("Successfully initailized sample sheet to: {0}".format(ss_output))
 
 if __name__ == "__main__":
     sys.exit(main())
