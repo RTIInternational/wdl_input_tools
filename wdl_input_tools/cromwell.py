@@ -125,8 +125,3 @@ def get_wf_summary(cromwell_auth, wf_id):
         if k in valid_labels:
             metadata[k] = v
     return metadata
-
-
-
-
-
