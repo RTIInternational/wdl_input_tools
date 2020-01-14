@@ -166,27 +166,6 @@ class InputSampleSheet:
             raise IOError(err_msg)
 
 
-class CromwellStatusSheet:
-    REQUIRED_COLS = [const.CROMWELL_UNIQUE_LABEL,
-                     const.CROMWELL_SAMPLE_LABEL,
-                     const.CROMWELL_BATCH_SAMPLE_LABEL,
-                     const.CROMWELL_BATCH_LABEL]
-
-    def __init__(self, status_sheet_file):
-        self.status_sheet = pd.read_excel(status_sheet_file)
-
-        # Check to make sure required columns are present
-        errors = False
-        for required_col in self.REQUIRED_COLS:
-            if required_col not in self.status_sheet.columns:
-                logging.error("Status sheet missing required column: {0}".format(required_col))
-                errors = True
-        if errors:
-            err_msg = "Invalid CromwellStatusSheet! Missing one or more required columns. See above for details."
-            logging.error(err_msg)
-            raise IOError(err_msg)
-
-
 def init_sample_sheet_file(wdl_template, output_file, optional_cols=[], num_samples=1):
     # Create an empty excel spreadsheet for user to fill in values to input to workflow
     cols_2_include = wdl_template.required_cols
@@ -252,16 +231,11 @@ def make_batch_labels(sample_sheet, wdl_template, batch_id):
 
 def validate_wf_labels(wf_labels):
     # Raise error if any of the required labels are missing from wf label dict
-    required_labels = [const.CROMWELL_UNIQUE_LABEL,
-                       const.CROMWELL_SAMPLE_LABEL,
-                       const.CROMWELL_BATCH_SAMPLE_LABEL,
-                       const.CROMWELL_BATCH_LABEL,
-                       const.CROMWELL_BATCH_STATUS_FIELD]
 
     # Loop through and check all required labels
-    for req_label in required_labels:
+    for req_label in const.REQUIRED_WF_LABELS:
         # Raise error if label not present in workflow label set
-        if req_label not in required_labels:
+        if req_label not in const.REQUIRED_WF_LABELS:
             if req_label != const.CROMWELL_UNIQUE_LABEL:
                 err_msg = "Workflow '{0}' missing required label: {1}".format(wf_labels[const.CROMWELL_UNIQUE_LABEL],
                                                                               req_label)
