@@ -13,7 +13,7 @@ import wdl_input_tools.helpers as utils
 
 def get_argparser():
     # Configure and return argparser object for reading command line arguments
-    argparser_obj = argparse.ArgumentParser(prog="init_batch_sample_sheet")
+    argparser_obj = argparse.ArgumentParser(prog="make_batch_inputs")
 
     def file_type(arg_string):
         """
