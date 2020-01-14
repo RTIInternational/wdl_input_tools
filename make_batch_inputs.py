@@ -60,6 +60,20 @@ def get_argparser():
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")
 
+    # Output prefix
+    argparser_obj.add_argument("--force",
+                               action="store_true",
+                               dest="force_overwrite",
+                               help="Flag to disable batch-name uniqueness checking.")
+
+    # Cromwell server IP address
+    argparser_obj.add_argument("--cromwell-url",
+                               action="store",
+                               type=str,
+                               dest="cromwell_url",
+                               required=True,
+                               help="URL for connecting to Cromwell server (IP + Port; e.g. 10.12.154.0:8000)")
+
     # Verbosity level
     argparser_obj.add_argument("-v",
                                action='count',
@@ -88,6 +102,11 @@ def main():
     ss_file  = args.sample_sheet_file
     batch_name = args.batch_name
     output_prefix = args.output_prefix
+    force_overwrite = args.force_overwrite
+    cromwell_url = args.cromwell_url
+
+    # Standardize url
+    cromwell_url = "http://"+cromwell_url.rpartition('/')[-1]
 
     # Configure logging appropriate for verbosity
     configure_logging(args.verbosity_level)
@@ -101,8 +120,12 @@ def main():
     # Validate sample sheet using validation functions specified in batch config file
     batch_config.validate_sample_sheet(sample_sheet)
 
+    # Authenticate and validate cromwell server
+    auth = cromwell.get_cromwell_auth(url=cromwell_url)
+    cromwell.validate_cromwell_server(auth)
+
     # Throw error if batch name is not unique
-    if not cromwell.is_unique_batch_name(batch_name):
+    if not cromwell.is_unique_batch_name(auth, batch_name) and not force_overwrite:
         err_msg = "Batch name '{0}' is not unique! Pick another name for this batch".format(batch_name)
         logging.error(err_msg)
         raise IOError(err_msg)
@@ -110,7 +133,7 @@ def main():
     # Write batch output files
     batch_inputs_file = "{0}.inputs.json".format(output_prefix)
     batch_labels_file = "{0}.labels.json".format(output_prefix)
-    batch_status_file = "{0}.cromwell_status.xlsx".format(output_prefix)
+    batch_status_file = "{0}.batch_report.xlsx".format(output_prefix)
 
     # Write batch input json
     logging.info("Making JSON input file for batch...")
