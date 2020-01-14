@@ -235,7 +235,7 @@ def validate_wf_labels(wf_labels):
     # Loop through and check all required labels
     for req_label in const.REQUIRED_WF_LABELS:
         # Raise error if label not present in workflow label set
-        if req_label not in const.REQUIRED_WF_LABELS:
+        if req_label not in wf_labels:
             if req_label != const.CROMWELL_UNIQUE_LABEL:
                 err_msg = "Workflow '{0}' missing required label: {1}".format(wf_labels[const.CROMWELL_UNIQUE_LABEL],
                                                                               req_label)
