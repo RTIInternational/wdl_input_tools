@@ -1,5 +1,7 @@
 import sys
 import logging
+import json
+import numpy as np
 
 
 def configure_logging(verbosity):
@@ -32,3 +34,15 @@ def configure_logging(verbosity):
     # Setting the level of the logs
     level = [logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG][verbosity]
     logging.getLogger().setLevel(level)
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NpEncoder, self).default(obj)
