@@ -8,6 +8,7 @@ import os
 import yaml
 
 import wdl_input_tools.validate as validate
+import wdl_input_tools.contants as const
 
 
 class BatchConfig:
@@ -165,6 +166,26 @@ class InputSampleSheet:
             raise IOError(err_msg)
 
 
+class CromwellStatusSheet:
+    REQUIRED_COLS = [const.CROMWELL_UNIQUE_LABEL,
+                     const.CROMWELL_SAMPLE_LABEL,
+                     const.CROMWELL_BATCH_LABEL]
+
+    def __init__(self, status_sheet_file):
+        self.status_sheet = pd.read_excel(status_sheet_file)
+
+        # Check to make sure required columns are present
+        errors = False
+        for required_col in self.REQUIRED_COLS:
+            if required_col not in self.status_sheet.columns:
+                logging.error("Status sheet missing required column: {0}".format(required_col))
+                errors = True
+        if errors:
+            err_msg = "Invalid CromwellStatusSheet! Missing one or more required columns. See above for details."
+            logging.error(err_msg)
+            raise IOError(err_msg)
+
+
 def init_sample_sheet_file(wdl_template, output_file, optional_cols=[], num_samples=1):
     # Create an empty excel spreadsheet for user to fill in values to input to workflow
     cols_2_include = wdl_template.required_cols
@@ -216,11 +237,11 @@ def make_batch_labels(sample_sheet, wdl_template, batch_id):
 
     # Create a set of unique labels for each sample
     for sample_name in sample_sheet.sample_names:
-        batch_label = {"cromwell_batch_label": batch_id,
-                       "cromwell_sample_label": sample_name,
-                       "cromwell_unique_label": "{0}_{1}_{2}_{3}".format(wdl_template.workflow_name,
-                                                                         batch_id,
-                                                                         sample_name,
-                                                                         str(uuid.uuid1())[0:7])}
+        batch_label = {const.CROMWELL_BATCH_LABEL: batch_id,
+                       const.CROMWELL_SAMPLE_LABEL: sample_name,
+                       const.CROMWELL_UNIQUE_LABEL: "{0}_{1}_{2}_{3}".format(wdl_template.workflow_name,
+                                                                             batch_id,
+                                                                             sample_name,
+                                                                             str(uuid.uuid1())[0:7])}
         batch_labels.append(batch_label)
     return batch_labels
