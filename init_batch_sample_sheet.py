@@ -6,6 +6,7 @@ import sys
 from wdl_input_tools.helpers import configure_logging
 import wdl_input_tools.core as wdl
 
+
 def get_argparser():
     # Configure and return argparser object for reading command line arguments
     argparser_obj = argparse.ArgumentParser(prog="init_batch_sample_sheet")
@@ -24,12 +25,12 @@ def get_argparser():
         return arg_string
 
     # Path to VCF input file
-    argparser_obj.add_argument("--wdl-input",
+    argparser_obj.add_argument("--batch-config",
                                action="store",
                                type=file_type,
-                               dest="wdl_input_file",
+                               dest="batch_config_file",
                                required=True,
-                               help="Path to WDL template")
+                               help="Path to batch config file")
 
     # Path to VCF input file
     argparser_obj.add_argument("--sample-sheet",
@@ -55,7 +56,7 @@ def get_argparser():
                                action='count',
                                dest='verbosity_level',
                                required=False,
-                               default=2,
+                               default=0,
                                help="Increase verbosity of the program."
                                     "Multiple -v's increase the verbosity level:\n"
                                     "0 = Errors\n"
@@ -74,7 +75,7 @@ def main():
     args = argparser.parse_args()
 
     # Input files: json input file to be used as template and
-    wdl_input = args.wdl_input_file
+    batch_config_file = args.batch_config_file
     ss_output = args.sample_sheet_file
     optional_cols = args.optional_cols
 
@@ -82,7 +83,8 @@ def main():
     configure_logging(args.verbosity_level)
 
     # Read in WDL template from JSON file
-    wdl_template = wdl.WDLInputTemplate(wdl_input)
+    batch_config = wdl.BatchConfig(batch_config_file)
+    wdl_template = batch_config.batch_wdl_template
 
     # Get additional columns to include
     optional_cols = [x.strip() for x in optional_cols.split(",") if x != ""] if optional_cols != "ALL" else wdl_template.optional_cols
