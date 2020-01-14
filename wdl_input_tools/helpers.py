@@ -2,6 +2,8 @@ import sys
 import logging
 import json
 import numpy as np
+import string
+import re
 
 
 def configure_logging(verbosity):
@@ -46,3 +48,7 @@ class NpEncoder(json.JSONEncoder):
             return obj.tolist()
         else:
             return super(NpEncoder, self).default(obj)
+
+def make_cromwell_compat_string(s):
+    regex = re.compile('[%s]' % re.escape(string.punctuation))
+    return regex.sub('-', s)
