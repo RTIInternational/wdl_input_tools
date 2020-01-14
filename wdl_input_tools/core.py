@@ -169,6 +169,7 @@ class InputSampleSheet:
 class CromwellStatusSheet:
     REQUIRED_COLS = [const.CROMWELL_UNIQUE_LABEL,
                      const.CROMWELL_SAMPLE_LABEL,
+                     const.CROMWELL_BATCH_SAMPLE_LABEL,
                      const.CROMWELL_BATCH_LABEL]
 
     def __init__(self, status_sheet_file):
@@ -239,9 +240,32 @@ def make_batch_labels(sample_sheet, wdl_template, batch_id):
     for sample_name in sample_sheet.sample_names:
         batch_label = {const.CROMWELL_BATCH_LABEL: batch_id,
                        const.CROMWELL_SAMPLE_LABEL: sample_name,
+                       const.CROMWELL_BATCH_SAMPLE_LABEL: "{0}_{1}".format(batch_id, sample_name),
+                       const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG,
                        const.CROMWELL_UNIQUE_LABEL: "{0}_{1}_{2}_{3}".format(wdl_template.workflow_name,
                                                                              batch_id,
                                                                              sample_name,
                                                                              str(uuid.uuid1())[0:7])}
         batch_labels.append(batch_label)
     return batch_labels
+
+
+def validate_wf_labels(wf_labels):
+    # Raise error if any of the required labels are missing from wf label dict
+    required_labels = [const.CROMWELL_UNIQUE_LABEL,
+                       const.CROMWELL_SAMPLE_LABEL,
+                       const.CROMWELL_BATCH_SAMPLE_LABEL,
+                       const.CROMWELL_BATCH_LABEL,
+                       const.CROMWELL_BATCH_STATUS_FIELD]
+
+    # Loop through and check all required labels
+    for req_label in required_labels:
+        # Raise error if label not present in workflow label set
+        if req_label not in required_labels:
+            if req_label != const.CROMWELL_UNIQUE_LABEL:
+                err_msg = "Workflow '{0}' missing required label: {1}".format(wf_labels[const.CROMWELL_UNIQUE_LABEL],
+                                                                              req_label)
+            else:
+                err_msg = "One or more workflow label dicts missing required label: {0}".format(req_label)
+            logging.error(err_msg)
+            raise IOError(err_msg)
