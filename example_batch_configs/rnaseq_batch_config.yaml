@@ -1,0 +1,43 @@
+input_template:
+  '{
+
+    "## Sample attributes": "",
+    "rnaseq_pe_wf.sample_name": "",
+    "rnaseq_pe_wf.fastq_R1": "",
+    "rnaseq_pe_wf.fastq_R2": "",
+    "rnaseq_pe_wf.read_len": 75,
+    "rnaseq_pe_wf.is_phred33": true,
+    "rnaseq_pe_wf.is_stranded": true,
+
+    "## Reference files": "",
+    "rnaseq_pe_wf.adapters_fa": "s3://rti-common/rnaseq_refs/hg38/rnaseq_trimmomaic_adapters.fa",
+    "rnaseq_pe_wf.genome_fa": "s3://rti-common/rnaseq_refs/hg38/GRCh38.primary_assembly.genome.fa",
+    "rnaseq_pe_wf.annotation_bed": "s3://rti-common/rnaseq_refs/hg38/gencode.v30.primary_assembly.annotation.bed",
+    "rnaseq_pe_wf.annotation_gtf": "s3://rti-common/rnaseq_refs/hg38/gencode.v30.primary_assembly.annotation.gtf",
+    "rnaseq_pe_wf.flattened_annotation_gff": "s3://rti-common/rnaseq_refs/hg38/gencode.v30.primary_assembly.annotation.flattened.gff",
+
+    "## Transcriptome alignment indices": "",
+    "rnaseq_pe_wf.salmon_index_tar_file": "s3://rti-common/rnaseq_refs/hg38/salmon_index_hg38_gencode_human_v30.tar.gz",
+    "rnaseq_pe_wf.salmon_index_name": "salmon_index_hg38_gencode_human_v30",
+    "rnaseq_pe_wf.hisat2_ref": "s3://rti-common/rnaseq_refs/hg38/hg38_gencode_human_v30.tar.gz",
+    "rnaseq_pe_wf.hisat2_ref_name": "hg38_gencode_human_v30",
+
+    "## Other parameters": "",
+    "rnaseq_pe_wf.trim_headcrop_len": 3,
+    "rnaseq_pe_wf.regtools_strand_specificity": 0
+
+  }'
+
+sample_id_col: rnaseq_pe_wf.sample_name
+
+sample_sheet_validators: [validate_ss_against_wdl_template]
+
+merge_json:
+  '
+  merge_rnaseq_samples_wf.sample_names: "",
+  merge_rnaseq_samples_wf.multiqc_input_dirs: "<<rnaseq_pe_wf.salmon_quant_dir>>",
+  merge_rnaseq_samples_wf.salmon_quant_dirs: "<<rnaseq_pe_wf.multiqc_input_dir>>",
+  '
+
+
+
