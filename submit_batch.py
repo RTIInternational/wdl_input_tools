@@ -10,7 +10,7 @@ import copy
 
 from cromwell_tools.cromwell_api import CromwellAPI
 
-from wdl_input_tools.helpers import configure_logging
+import wdl_input_tools.helpers as utils
 import wdl_input_tools.core as wdl
 import wdl_input_tools.cromwell as cromwell
 import wdl_input_tools.contants as const
@@ -177,10 +177,10 @@ def main():
     cromwell_url = args.cromwell_url
 
     # Standardize url
-    cromwell_url = "http://"+cromwell_url.rpartition('/')[-1]
+    cromwell_url = utils.fix_url(cromwell_url)
 
     # Configure logging appropriate for verbosity
-    configure_logging(args.verbosity_level)
+    utils.configure_logging(args.verbosity_level)
 
     # Read in batch inputs
     with open(batch_input_json, "r") as fh:
