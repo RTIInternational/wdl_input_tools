@@ -13,7 +13,7 @@ def get_argparser():
     # Configure and return argparser object for reading command line arguments
     argparser_obj = argparse.ArgumentParser(prog="get_batch_status")
 
-    # Output prefix
+    # Name of batch from which to fetch status updates
     argparser_obj.add_argument("--batch-name",
                                action="store",
                                type=str,
@@ -21,7 +21,7 @@ def get_argparser():
                                required=True,
                                help="Batch name. Will return all workflows where cromwell-batch-name-label is this batch-name")
 
-    # Output prefix
+    # Output prefix for status output file
     argparser_obj.add_argument("--output-prefix",
                                action="store",
                                type=str,
@@ -29,7 +29,7 @@ def get_argparser():
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")
 
-    # Output prefix
+    # Whether to show status of batch workflows excluded from the active batch (batch_status == excluded)
     argparser_obj.add_argument("--show-excluded",
                                action="store_true",
                                dest="show_excluded",
@@ -108,7 +108,7 @@ def main():
     num_success = len(report_df[report_df[const.CROMWELL_STATUS_FIELD] == const.CROMWELL_SUCCESS_STATUS][const.CROMWELL_SAMPLE_LABEL].unique())
     logging.info("{0}/{1} ({2}%) samples in batch have completed successfully!".format(num_success,
                                                                                        num_samples,
-                                                                                       num_success/(1.0*num_samples)))
+                                                                                       (num_success/(1.0*num_samples))*100))
 
     # Remove workflows not in active batch unless otherwise specified
     if not show_excluded:

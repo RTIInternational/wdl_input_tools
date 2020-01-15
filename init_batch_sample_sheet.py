@@ -24,7 +24,7 @@ def get_argparser():
 
         return arg_string
 
-    # Path to VCF input file
+    # Path to batch config file that defines input template, validation classes, and merge instructions
     argparser_obj.add_argument("--batch-config",
                                action="store",
                                type=file_type,
@@ -32,7 +32,7 @@ def get_argparser():
                                required=True,
                                help="Path to batch config file")
 
-    # Path to VCF input file
+    # Output path where sample sheet template will be written
     argparser_obj.add_argument("--sample-sheet",
                                action="store",
                                type=str,
@@ -40,7 +40,8 @@ def get_argparser():
                                required=True,
                                help="Path to output file where sample sheet will be initialized")
 
-    # Path to VCF input file
+    # List of optional values to include in sample sheet template
+    # Default behavior is to output only required columns to sample sheet template
     argparser_obj.add_argument("--optional-cols",
                                action="store",
                                type=str,

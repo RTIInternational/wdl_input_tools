@@ -59,7 +59,8 @@ def get_argparser():
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")
 
-    # Output prefix
+    # Option to override name-checking
+    # If not specified, program will error out if batch_name is not unique to cromwell
     argparser_obj.add_argument("--force",
                                action="store_true",
                                dest="force_overwrite",
