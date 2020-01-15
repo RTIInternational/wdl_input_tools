@@ -3,7 +3,7 @@ import os
 import logging
 import sys
 
-from wdl_input_tools.helpers import configure_logging
+import wdl_input_tools.helpers as utils
 import wdl_input_tools.core as wdl
 
 
@@ -80,7 +80,7 @@ def main():
     optional_cols = args.optional_cols
 
     # Configure logging appropriate for verbosity
-    configure_logging(args.verbosity_level)
+    utils.configure_logging(args.verbosity_level)
 
     # Read in WDL template from JSON file
     batch_config = wdl.BatchConfig(batch_config_file)
