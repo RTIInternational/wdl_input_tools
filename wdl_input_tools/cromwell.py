@@ -40,20 +40,13 @@ def is_unique_batch_name(cromwell_auth, batch_name):
     return len(batch_wfs) == 0
 
 
-def get_batch_conflicts(cromwell_auth, batch_sample_labels):
+def get_batch_conflicts(cromwell_auth, batch_sample_label):
     # Query cromwell server to see if any active workflows currently exist in batch with same sample name
     # Return dictionary of conflicting workflow ids
-    conflicting_wfs = {}
-    for bs_label in batch_sample_labels:
-        # Query only for active workflows in batch that have same batch_sample label
-        query = {"label": {const.CROMWELL_BATCH_SAMPLE_LABEL: bs_label,
-                           const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG}}
-        wf_ids = query_workflows(cromwell_auth, query)
-        if wf_ids:
-            # Add conflicting workflow to hash
-            logging.warning("Batch-Sample label already exists in batch: {0}".format(bs_label))
-            conflicting_wfs[bs_label] = wf_ids
-    return conflicting_wfs
+    # Query only for active workflows in batch that have same batch_sample label
+    query = {"label": {const.CROMWELL_BATCH_SAMPLE_LABEL: batch_sample_label,
+                       const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG}}
+    return query_workflows(cromwell_auth, query)
 
 
 def wf_exists(cromwell_auth, wf_id):

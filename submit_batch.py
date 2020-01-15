@@ -73,11 +73,18 @@ def get_argparser():
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")
 
-    # Output prefix
-    argparser_obj.add_argument("--force",
-                               action="store_true",
-                               dest="force_overwrite",
-                               help="Flag to disable batch-name uniqueness checking.")
+    # Abort batch conflicts that are actively running and re-submit duplicate workflow
+    argparser_obj.add_argument("--batch-conflict-action",
+                               action="store",
+                               dest="batch_conflict_action",
+                               type=str,
+                               choices=["rerun-all", "rerun-unless-success", "rerun-failed"],
+                               default="rerun-failed",
+                               help="Action on batch conflict:\n"
+                                    "rerun-failed = Only re-run samples if a previous wf failed\n"
+                                    "rerun-all-but-success = Re-run sample unless previous wf succeeded. "
+                                    "Aborts prior running/submitted workflows\n"
+                                    "rerun-all = Re-run all samples regardless of prior workflow success" )
 
     # Cromwell server IP address
     argparser_obj.add_argument("--cromwell-url",
@@ -103,36 +110,50 @@ def get_argparser():
     return argparser_obj
 
 
-def log_submissions(submit_report, output_prefix, failed_workflow_index=None):
+def resolve_batch_conflict(auth, batch_conflict_wf, batch_conflict_action):
+    # Applies rerun logic to determine whether to rerun a workflow for sample when one already exists
 
-    # Write specify file
-    logging.info("Writing workflow report...")
-    report_file = "{0}.submit_batch.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
+    can_overwrite_batch_conflict = True         # Whether the previous workflow can be replaced by another submission
 
-    report_df = pd.DataFrame(data=submit_report)
+    # Get status of previous workflow
+    batch_conflict_status = cromwell.get_wf_status(auth, batch_conflict_wf)
+    batch_conflict_alive = batch_conflict_status not in [const.CROMWELL_FAILED_STATUS,
+                                                         const.CROMWELL_SUCCESS_STATUS,
+                                                         const.CROMWELL_ABORTED_STATUS,
+                                                         const.CROMWELL_ABORTING_STATUS]
+
+    # Cannot overwrite successful workflows unless rerun-all option specified
+    if batch_conflict_status == const.CROMWELL_SUCCESS_STATUS and batch_conflict_action != "rerun-all":
+        can_overwrite_batch_conflict = False
+
+    # Cannot overwrite running/pending/submitted workflows unless rerun-unless-success option specified
+    elif batch_conflict_alive and batch_conflict_action == "rerun-failed":
+        can_overwrite_batch_conflict = False
+
+    # Abort batch conflict workflow if it can be overwritten and is currently in a non-terminal state
+    abort_batch_conflict = batch_conflict_alive and can_overwrite_batch_conflict
+    return can_overwrite_batch_conflict, abort_batch_conflict
+
+
+def output_job_report(job_report, report_file, failed_workflow_index=None):
+    # Convert dict to a dataframe for easier munging
+    report_df = pd.DataFrame(data=job_report)
 
     # Add null values for column in boundary case where no workflows succeeded
-    if not const.CROMWELL_WF_ID_FIELD in report_df.columns:
-        report_df[const.CROMWELL_WF_ID_FIELD] = np.nan
-    if not const.SUPERCEDED_WF_FIELD in report_df.columns:
-        report_df[const.SUPERCEDED_WF_FIELD] = np.nan
+    for col in [const.CROMWELL_WF_ID_FIELD, const.SUPERCEDED_WF_FIELD, const.REPORT_INFO_FIELD]:
+        if col not in report_df.columns:
+            report_df[col] = np.nan
 
     # Reorder columns in a standard order
     report_df = report_df[const.REPORT_COL_ORDER]
 
-    # Count number of successes
-    num_success = len(report_df[~report_df[const.CROMWELL_WF_ID_FIELD].isna()])
-
     # Fill in NA values from skipped workflows if error occured mid batch to indicate theses workflows weren't submitted
-    report_df.fillna("SKIPPED")
+    report_df.fillna("SKIPPED AFTER FAILURE")
 
     if failed_workflow_index is not None:
         failed_col = [""]*len(report_df)
         failed_col[failed_workflow_index] = "FAILED WORKFLOW"
         report_df["Failed"] = pd.Series(failed_col)
-
-    logging.info("Successfully submitted {0} out of {1} workflows in batch!".format(num_success,
-                                                                                    len(report_df)))
 
     # Write to separate files
     report_df.to_excel(report_file, index=False)
@@ -152,7 +173,7 @@ def main():
     wdl_workflow = args.wdl_workflow
     wdl_imports = args.wdl_imports
     output_prefix = args.output_prefix
-    force_overwrite = args.force_overwrite
+    batch_conflict_action = args.batch_conflict_action
     cromwell_url = args.cromwell_url
 
     # Standardize url
@@ -178,64 +199,87 @@ def main():
     auth = cromwell.get_cromwell_auth(url=cromwell_url)
     cromwell.validate_cromwell_server(auth)
 
-    # Check for batch/sample conflicts and error out if --force option not used
-    logging.info("Checking to see if any duplicate samples already exist in batch")
-    batch_sample_labels = [wf_labels[const.CROMWELL_BATCH_SAMPLE_LABEL] for wf_labels in batch_labels]
-    batch_conflicts = cromwell.get_batch_conflicts(auth, batch_sample_labels)
-    if not force_overwrite and batch_conflicts:
-        base_err_msg = "Cannot submit batch because one or more sample names conflicts with sample already in batch!"
-        logging.error(base_err_msg)
-        logging.error("Batch-sample conflicts: {0}".format(", ".join(batch_conflicts.keys())))
-        raise IOError(base_err_msg)
-    else:
-        logging.warning("There are {0} batch/sample conflicts! See above logs for details.".format(len(batch_conflicts)))
+    # Create a report to detail what jobs were run/skipped/failed
+    job_report = copy.deepcopy(batch_labels)
+    report_file = "{0}.submit_batch.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
 
-    # Run workflows and exclude any conflicting workflows from current batch
-    submit_report = copy.deepcopy(batch_labels)
+    # Loop through workflows to see if they need to be run/rerun
+    submitted_wfs = 0
     for i in range(len(batch_inputs)):
+        # Get inputs, labels, and batch_sample label for next workflow in batch
         wf_input = batch_inputs[i]
         wf_labels = batch_labels[i]
         batch_sample_label = wf_labels[const.CROMWELL_BATCH_SAMPLE_LABEL]
 
-        # Submit workflow
+        # Try to run the workflow
         try:
-            wf_id = cromwell.submit_wf_from_dict(auth,
-                                                wdl_workflow,
-                                                input_dict=wf_input,
-                                                dependencies=wdl_imports,
-                                                label_dict=wf_labels)
 
-            # Update information for report
-            submit_report[i][const.CROMWELL_WF_ID_FIELD] = wf_id
-            wf_conflicts = [""] if batch_sample_label not in batch_conflicts else batch_conflicts[batch_sample_label]
-            submit_report[i][const.SUPERCEDED_WF_FIELD] = ", ".join(wf_conflicts)
+            # Get list of previous workflows in this batch with the same sample name (batch conflicts)
+            batch_conflict_wfs = cromwell.get_batch_conflicts(auth, batch_sample_label)
 
-            if batch_sample_label not in batch_conflicts:
-                continue
+            # Determine how to resolve each batch conflict
+            can_submit_wf = True
+            for batch_conflict_wf in batch_conflict_wfs:
+                can_overide_conflict_wf, abort_conflict_wf = resolve_batch_conflict(auth,
+                                                                                    batch_conflict_wf,
+                                                                                    batch_conflict_action)
 
-            # Change labels on conflicting workflows to 'exclude' to remove from active batch
-            for batch_conflict_wf in wf_conflicts:
-                # Exclude conflicting workflow from batch
-                logging.warning("Excluding wf from batch due to new sample: {0}".format(batch_conflict_wf))
-                cromwell.update_wf_batch_status(auth, batch_conflict_wf, include_in_batch=False)
+                # Exclude prior conflicting wf from the current active batch
+                if can_overide_conflict_wf:
+                    cromwell.update_wf_batch_status(auth, batch_conflict_wf, include_in_batch=False)
 
-                # Abort workflows if they're currently running
-                conflict_wf_status = cromwell.get_wf_status(auth, batch_conflict_wf)
-                if conflict_wf_status == const.CROMWELL_RUNNING_STATUS:
+                # Abort prior conflicting wf if in non-terminal state (fail, success)
+                if abort_conflict_wf:
                     CromwellAPI.abort(batch_conflict_wf, auth, raise_for_status=True)
                     logging.warning("Aborted conflicting wf '{0}' "
                                     "with duplicate batch_sample_id '{1}'".format(batch_conflict_wf,
                                                                                   batch_sample_label))
 
+                # Workflow can only be submitted if it can override all prior workflows
+                can_submit_wf = can_submit_wf and can_overide_conflict_wf
+
+            # Workflow id of submission and message to print in job report file.
+            # Will be overwritten if job is submitted.
+            wf_id = "Not submitted"
+            msg = "SupercededWF is either running/submitted or was successful."
+
+            # Run the workflow if you can
+            if can_submit_wf:
+
+                # Show some logging stuff
+                logging.info("Submitting workflow for '{0}'".format(batch_sample_label))
+                if batch_conflict_wfs:
+                    logging.warning("Superceded workflows: {0}".format(", ".join(batch_conflict_wfs)))
+
+                # Submit workflow and get id of the newly submitted workflow
+                wf_id = cromwell.submit_wf_from_dict(auth,
+                                                     wdl_workflow,
+                                                     input_dict=wf_input,
+                                                     dependencies=wdl_imports,
+                                                     label_dict=wf_labels)
+
+                # Increment counter of successfully submitted workflows
+                submitted_wfs += 1
+                msg = ""
+
+            # Update information for report
+            job_report[i][const.CROMWELL_WF_ID_FIELD] = wf_id
+            job_report[i][const.SUPERCEDED_WF_FIELD] = ", ".join(batch_conflict_wfs)
+            job_report[i][const.REPORT_INFO_FIELD] = msg
 
         except BaseException:
             # Log any successful submissions and indicate workflow which caused failure
-            log_submissions(submit_report, output_prefix, failed_workflow_index=i)
+            logging.info("Successfully submitted {0} out of {1} workflows in batch!".format(submitted_wfs,
+                                                                                            len(batch_inputs)))
+            logging.info("Writing workflow report...")
+            output_job_report(job_report, report_file, failed_workflow_index=i)
             raise
 
     # Log submission if all workflows submitted successfully
-    logging.info("Successfully submitted all workflows in batch!")
-    log_submissions(submit_report, output_prefix)
+    logging.info("Successfully submitted {0} out of {1} workflows in batch!".format(submitted_wfs,
+                                                                                    len(batch_inputs)))
+    logging.info("Writing workflow report...")
+    output_job_report(job_report, report_file)
 
 
 if __name__ == "__main__":
