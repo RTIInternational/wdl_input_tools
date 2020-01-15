@@ -131,6 +131,8 @@ def get_wf_summary(cromwell_auth, wf_id):
     label_dict = metadata.pop(const.CROMWELL_LABEL_FIELD)
     for k, v in label_dict.items():
         if k in valid_labels:
+            if k == const.CROMWELL_WF_ID_FIELD:
+                v = v.replace("cromwell-", "")
             metadata[k] = v
     return metadata
 
