@@ -1,17 +1,11 @@
 import argparse
-import os
 import logging
 import sys
-import json
 import pandas as pd
-import numpy as np
 import time
-import copy
 
-from cromwell_tools.cromwell_api import CromwellAPI
 
-from wdl_input_tools.helpers import configure_logging
-import wdl_input_tools.core as wdl
+import wdl_input_tools.helpers as utils
 import wdl_input_tools.cromwell as cromwell
 import wdl_input_tools.contants as const
 
@@ -81,10 +75,10 @@ def main():
     cromwell_url = args.cromwell_url
 
     # Standardize url
-    cromwell_url = "http://"+cromwell_url.rpartition('/')[-1]
+    cromwell_url = utils.fix_url(cromwell_url)
 
     # Configure logging appropriate for verbosity
-    configure_logging(args.verbosity_level)
+    utils.configure_logging(args.verbosity_level)
 
     # Authenticate and validate cromwell server
     auth = cromwell.get_cromwell_auth(url=cromwell_url)
@@ -102,7 +96,6 @@ def main():
     wf_summaries = []
     for batch_wf in batch_wfs:
         wf_summaries.append(cromwell.get_wf_summary(auth, batch_wf))
-
 
     logging.info("Writing workflow report...")
     report_file = "{0}.batch_status.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
