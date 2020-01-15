@@ -49,6 +49,11 @@ class NpEncoder(json.JSONEncoder):
         else:
             return super(NpEncoder, self).default(obj)
 
+
 def make_cromwell_compat_string(s):
     regex = re.compile('[%s]' % re.escape(string.punctuation))
     return regex.sub('-', s)
+
+
+def fix_url(http):
+    return "http://" + http.rpartition('/')[-1]
