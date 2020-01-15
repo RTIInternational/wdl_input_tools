@@ -16,9 +16,18 @@ CROMWELL_BATCH_STATUS_FIELD = "cromwell-batch-status"
 CROMWELL_BATCH_STATUS_INCLUDE_FLAG = "include"
 CROMWELL_BATCH_STATUS_EXCLUDE_FLAG = "exclude"
 CROMWELL_WF_NAME_FIELD = "workflowName"
+SUPERCEDED_WF_FIELD = "SupercededWFs"
 
 REQUIRED_WF_LABELS = [CROMWELL_UNIQUE_LABEL,
                       CROMWELL_BATCH_STATUS_FIELD,
                       CROMWELL_BATCH_LABEL,
                       CROMWELL_BATCH_SAMPLE_LABEL,
                       CROMWELL_SAMPLE_LABEL]
+
+REPORT_COL_ORDER = [CROMWELL_WF_ID_FIELD,
+                    CROMWELL_UNIQUE_LABEL,
+                    CROMWELL_SAMPLE_LABEL,
+                    CROMWELL_BATCH_LABEL,
+                    CROMWELL_BATCH_SAMPLE_LABEL,
+                    CROMWELL_BATCH_STATUS_FIELD,
+                    SUPERCEDED_WF_FIELD]

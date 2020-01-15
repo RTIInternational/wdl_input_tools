@@ -1,5 +1,7 @@
 import requests
 import logging
+import tempfile
+import json
 
 from cromwell_tools.cromwell_api import CromwellAPI
 from cromwell_tools.cromwell_auth import CromwellAuth
@@ -86,7 +88,7 @@ def query_workflows(cromwell_auth, query):
         logging.error("Unable to run query: {0}".format(query))
         logging.error("Message from cromwell server:\n{0}".format(result.json()))
         raise
-    return [wf["id"] for wf in result.json()['results']]
+    return [wf["id"] for wf in result.json()['results'] if "parentWorkflowId" not in wf]
 
 
 def get_wf_metadata(cromwell_auth, wf_id, include_keys=None, exclude_keys=None):
@@ -138,3 +140,34 @@ def get_wf_summary(cromwell_auth, wf_id):
         if k in valid_labels:
             metadata[k] = v
     return metadata
+
+
+def submit_wf_from_dict(auth, wdl_workflow, input_dict, dependencies=None, label_dict=None):
+
+    # Write input and label files to tmp files
+    input_file = tempfile.NamedTemporaryFile()
+    with open(input_file.name, "w") as fh:
+        json.dump(input_dict, fh)
+
+    if label_dict:
+        label_file = tempfile.NamedTemporaryFile()
+        with open(label_file.name, "w") as fh:
+            json.dump(label_dict, fh)
+    else:
+        label_file = None
+
+    try:
+        # Submit workflow and return id
+        result = CromwellAPI.submit(auth,
+                                    wdl_workflow,
+                                    input_file.name,
+                                    dependencies=dependencies,
+                                    label_file=label_file.name,
+                                    raise_for_status=True)
+        return result.json()["id"]
+
+    finally:
+        # Close temp files no matter what
+        input_file.close()
+        if label_dict:
+            label_file.close()
