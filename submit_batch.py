@@ -18,7 +18,7 @@ import wdl_input_tools.contants as const
 
 def get_argparser():
     # Configure and return argparser object for reading command line arguments
-    argparser_obj = argparse.ArgumentParser(prog="init_batch_sample_sheet")
+    argparser_obj = argparse.ArgumentParser(prog="submit_batch")
 
     def file_type(arg_string):
         """
@@ -33,7 +33,7 @@ def get_argparser():
 
         return arg_string
 
-    # Path to batch config file
+    # Path to json containing batch wdl inputs
     argparser_obj.add_argument("--inputs",
                                action="store",
                                type=file_type,
@@ -41,7 +41,7 @@ def get_argparser():
                                required=True,
                                help="Path to batch JSON inputs")
 
-    # Path to sample sheet excel file
+    # Path to json containing batch wdl labels
     argparser_obj.add_argument("--labels",
                                action="store",
                                type=file_type,
@@ -49,7 +49,7 @@ def get_argparser():
                                required=True,
                                help="Path to batch JSON label file")
 
-    # Path to sample sheet excel file
+    # Path to wdl workflow that will be run on each sample
     argparser_obj.add_argument("--wdl",
                                action="store",
                                type=file_type,
@@ -57,7 +57,7 @@ def get_argparser():
                                required=True,
                                help="Path to wdl workflow to be executed on batch")
 
-    # Path to sample sheet excel file
+    # Path to zipped directory of wdl workflow dependencies
     argparser_obj.add_argument("--imports",
                                action="store",
                                type=file_type,
@@ -73,7 +73,11 @@ def get_argparser():
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")
 
-    # Abort batch conflicts that are actively running and re-submit duplicate workflow
+    # Configure how to deal with batch conflicts (i.e. when a sample workflow has already been submitted/executed)
+    # It's basically the re-run policy. On any given batch you can choose to re-run:
+    # 1) only samples where previous workflow failed,
+    # 2) only samples that have not yet succeeded (failed/running/submitted/pending; good for hung jobs),
+    # 3) re-run everything in the batch regardless of any prior/ongoing workflows
     argparser_obj.add_argument("--batch-conflict-action",
                                action="store",
                                dest="batch_conflict_action",
@@ -82,7 +86,7 @@ def get_argparser():
                                default="rerun-failed",
                                help="Action on batch conflict:\n"
                                     "rerun-failed = Only re-run samples if a previous wf failed\n"
-                                    "rerun-all-but-success = Re-run sample unless previous wf succeeded. "
+                                    "rerun-unless-success = Re-run sample unless previous wf succeeded. "
                                     "Aborts prior running/submitted workflows\n"
                                     "rerun-all = Re-run all samples regardless of prior workflow success" )
 
@@ -113,7 +117,8 @@ def get_argparser():
 def resolve_batch_conflict(auth, batch_conflict_wf, batch_conflict_action):
     # Applies rerun logic to determine whether to rerun a workflow for sample when one already exists
 
-    can_overwrite_batch_conflict = True         # Whether the previous workflow can be replaced by another submission
+    # Whether the previous workflow can be replaced by another submission
+    can_overwrite_batch_conflict = True
 
     # Get status of previous workflow
     batch_conflict_status = cromwell.get_wf_status(auth, batch_conflict_wf)
@@ -122,11 +127,11 @@ def resolve_batch_conflict(auth, batch_conflict_wf, batch_conflict_action):
                                                          const.CROMWELL_ABORTED_STATUS,
                                                          const.CROMWELL_ABORTING_STATUS]
 
-    # Cannot overwrite successful workflows unless rerun-all option specified
+    # Do not overwrite successful workflows unless rerun-all option specified
     if batch_conflict_status == const.CROMWELL_SUCCESS_STATUS and batch_conflict_action != "rerun-all":
         can_overwrite_batch_conflict = False
 
-    # Cannot overwrite running/pending/submitted workflows unless rerun-unless-success option specified
+    # Do not overwrite running/pending/submitted workflows unless rerun-unless-success option specified
     elif batch_conflict_alive and batch_conflict_action == "rerun-failed":
         can_overwrite_batch_conflict = False
 
