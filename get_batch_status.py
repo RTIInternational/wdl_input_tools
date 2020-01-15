@@ -4,7 +4,6 @@ import sys
 import pandas as pd
 import time
 
-
 import wdl_input_tools.helpers as utils
 import wdl_input_tools.cromwell as cromwell
 import wdl_input_tools.contants as const
