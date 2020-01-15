@@ -31,3 +31,16 @@ REPORT_COL_ORDER = [CROMWELL_WF_ID_FIELD,
                     CROMWELL_BATCH_SAMPLE_LABEL,
                     CROMWELL_BATCH_STATUS_FIELD,
                     SUPERCEDED_WF_FIELD]
+
+STATUS_COL_ORDER = [CROMWELL_WF_ID_FIELD,
+                    CROMWELL_BATCH_STATUS_FIELD,
+                    CROMWELL_SAMPLE_LABEL,
+                    CROMWELL_UNIQUE_LABEL,
+                    CROMWELL_BATCH_LABEL,
+                    CROMWELL_BATCH_SAMPLE_LABEL,
+                    CROMWELL_STATUS_FIELD,
+                    CROMWELL_SUBMIT_FIELD,
+                    CROMWELL_START_FIELD,
+                    CROMWELL_END_FIELD,
+                    CROMWELL_WF_NAME_FIELD]
+
