@@ -47,4 +47,3 @@ STATUS_COL_ORDER = [CROMWELL_WF_ID_FIELD,
                     CROMWELL_START_FIELD,
                     CROMWELL_END_FIELD,
                     CROMWELL_WF_NAME_FIELD]
-
