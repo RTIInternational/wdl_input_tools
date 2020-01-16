@@ -89,6 +89,72 @@ def get_argparser():
     return argparser_obj
 
 
+def import_workflow_inputs(auth, batch_name, wdl_template):
+    # Import batch outputs specified in WDLTemplate to current workflow
+
+    # Get workflows in batch
+    query = {"label": {const.CROMWELL_BATCH_LABEL: batch_name,
+                       const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG}}
+    batch_wfs = cromwell.query_workflows(auth, query)
+
+    # Raise error if no workflows found in batch
+    if not batch_wfs:
+        err_msg = "Batch name '{0}' doesn't exist on cromwell server!".format(batch_name)
+        logging.error(err_msg)
+        raise IOError(err_msg)
+
+    # Get output files from each wf based on values specified in wf template
+    sample_names = []
+    wf_outputs = {key: [] for key in wdl_template.batch_import_keys}
+    for wf in batch_wfs:
+        metadata = CromwellAPI.metadata(wf, auth, includeKey=["outputs", "labels", "status"],
+                                        raise_for_status=True).json()
+        wf_status = metadata["status"]
+        sample_name = metadata["labels"][const.CROMWELL_SAMPLE_LABEL]
+
+        # Check to make sure sample name is unique in batch
+        if sample_name in sample_names:
+            err_msg = "Duplicate samples in batch: {0}! Samples must be unique. " \
+                      "Update batch status of non-unique sample runs!".format(sample_name)
+            logging.error(err_msg)
+            raise IOError(err_msg)
+
+        if wf_status != const.CROMWELL_SUCCESS_STATUS:
+            # Add null values for outputs from workflows that haven't or didn't succeed
+            # Let user decide what to do about these in the downstream sample sheet (exclude or rerun sample)
+            outputs = {key: "UNSUCCESSFUL/UNFINISHED WORKFLOW" for key in wdl_template.batch_output_cols}
+        else:
+            # Get output files from metadata using the keys specified in the WDL template
+            # E.g. @@@rnaseq_pe_wf.fastqc_file will look for an output with key 'rnaseq_pe_wf.fastqc_file'
+            try:
+                outputs = {key: metadata["outputs"][val] for key, val in wdl_template.batch_output_cols.items()}
+            except KeyError:
+                logging.error("Successful workflow '{0}' did not produce one "
+                              "or more outputs file keys specified in WDL template!".format(wf))
+                raise
+
+        # Get workflow labels specified in config
+        try:
+            labels = {key: metadata["labels"][val] for key, val in wdl_template.batch_label_cols.items()}
+        except KeyError:
+            logging.error("Successful workflow '{0}' did not have one "
+                          "or more workflow labels specified in WDL template!".format(wf))
+            raise
+
+        # Add output files from workflow to full set of output files
+        for wdl_template_key, wf_output in outputs.items():
+            wf_outputs[wdl_template_key].append(wf_output)
+
+        # Add labels from workflow to full set of labels
+        for wdl_template_key, wf_label in labels.items():
+            wf_outputs[wdl_template_key].append(wf_label)
+
+        # Add sample name to list of seen samples
+        sample_names.append(sample_name)
+
+    return wf_outputs
+
+
 def main():
 
     # Configure argparser
@@ -117,7 +183,6 @@ def main():
 
     # Authenticate to server and validate batch name
     wf_outputs = {}
-    sample_names = []
     if wdl_template.imports_from_batch:
         logging.info("WDL template detects inputs that should be imported from previous batch!")
         # Raise error if imports are required but no batch name given on command line
@@ -130,63 +195,8 @@ def main():
         auth = cromwell.get_cromwell_auth(url=cromwell_url)
         cromwell.validate_cromwell_server(auth)
 
-        # Get workflows in batch
-        query = {"label": {const.CROMWELL_BATCH_LABEL: batch_name,
-                           const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG}}
-        batch_wfs = cromwell.query_workflows(auth, query)
-
-        # Raise error if no workflows found in batch
-        if not batch_wfs:
-            err_msg = "Batch name '{0}' doesn't exist on cromwell server!".format(batch_name)
-            logging.error(err_msg)
-            raise IOError(err_msg)
-
-        # Get output files from each wf based on values specified in wf template
-        wf_outputs = {key: [] for key in wdl_template.batch_import_keys}
-        for wf in batch_wfs:
-            metadata = CromwellAPI.metadata(wf, auth, includeKey=["outputs", "labels", "status"], raise_for_status=True).json()
-            wf_status = metadata["status"]
-            sample_name = metadata["labels"][const.CROMWELL_SAMPLE_LABEL]
-
-            # Check to make sure sample name is unique in batch
-            if sample_name in sample_names:
-                err_msg = "Duplicate samples in batch: {0}! Samples must be unique. " \
-                          "Update batch status of non-unique sample runs!".format(sample_name)
-                logging.error(err_msg)
-                raise IOError(err_msg)
-
-            if wf_status != const.CROMWELL_SUCCESS_STATUS:
-                # Add null values for outputs from workflows that haven't or didn't succeed
-                # Let user decide what to do about these in the downstream sample sheet (exclude or rerun sample)
-                outputs = {key: "UNSUCCESSFUL/UNFINISHED WORKFLOW" for key in wdl_template.batch_output_cols}
-            else:
-                # Get output files from metadata using the keys specified in the WDL template
-                # E.g. @@@rnaseq_pe_wf.fastqc_file will look for an output with key 'rnaseq_pe_wf.fastqc_file'
-                try:
-                    outputs = {key: metadata["outputs"][val] for key, val in wdl_template.batch_output_cols.items()}
-                except KeyError:
-                    logging.error("Successful workflow '{0}' did not produce one "
-                                  "or more outputs file keys specified in WDL template!".format(wf))
-                    raise
-
-            # Get workflow labels specified in config
-            try:
-                labels = {key: metadata["labels"][val] for key, val in wdl_template.batch_label_cols.items()}
-            except KeyError:
-                logging.error("Successful workflow '{0}' did not have one "
-                              "or more workflow labels specified in WDL template!".format(wf))
-                raise
-
-            # Add output files from workflow to full set of output files
-            for wdl_template_key, wf_output in outputs.items():
-                wf_outputs[wdl_template_key].append(wf_output)
-
-            # Add labels from workflow to full set of labels
-            for wdl_template_key, wf_label in labels.items():
-                wf_outputs[wdl_template_key].append(wf_label)
-
-            # Add sample name to list of seen samples
-            sample_names.append(sample_name)
+        # Grab outputs from batch workflows that match input keys specified in WDL template
+        wf_outputs = import_workflow_inputs(auth, batch_name, wdl_template)
 
     # Get additional columns to include
     optional_cols = [x.strip() for x in optional_cols.split(",") if x != ""] if optional_cols != "ALL" else wdl_template.optional_cols
