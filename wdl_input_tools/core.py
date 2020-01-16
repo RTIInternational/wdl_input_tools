@@ -119,7 +119,7 @@ class WDLInputTemplate:
         # Optional cols
         self.optional_cols = [key for key in self.wdl_input if key.startswith(self.workflow_name) and key not in self.required_cols]
 
-        # Special columns that point to inputs and labels from previous batch workflows
+        # Special keys for when workflow inputs must come from a previous batch workflow
         # This is mainly used for merge/gather workflows to pass inputs from upstream workflows to the template
         self.batch_output_cols = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.is_batch_output_col(v)}
         self.batch_label_cols  = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.is_batch_label_col(v)}
