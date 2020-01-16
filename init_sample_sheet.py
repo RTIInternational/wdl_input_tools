@@ -90,7 +90,7 @@ def get_argparser():
 
 
 def import_workflow_inputs(auth, batch_name, wdl_template):
-    # Import batch outputs specified in WDLTemplate to current workflow
+    # Import workflow outputs specified in WDLTemplate to current workflow
 
     # Get workflows in batch
     query = {"label": {const.CROMWELL_BATCH_LABEL: batch_name,
@@ -170,10 +170,6 @@ def main():
     batch_name = args.batch_name
     cromwell_url = args.cromwell_url
 
-    # Standardize url if provided
-    if cromwell_url:
-        cromwell_url = utils.fix_url(cromwell_url)
-
     # Configure logging appropriate for verbosity
     utils.configure_logging(args.verbosity_level)
 
@@ -185,13 +181,14 @@ def main():
     wf_outputs = {}
     if wdl_template.imports_from_batch:
         logging.info("WDL template detects inputs that should be imported from previous batch!")
-        # Raise error if imports are required but no batch name given on command line
+        # Raise error if imports are required but no batch name or cromwell server given on command line
         if batch_name is None or cromwell_url is None:
             err_msg = "Must provide batch name and cromwell_url when WDL template imports from previous batch!"
             logging.error(err_msg)
             raise IOError(err_msg)
 
         # Authenticate and validate cromwell server
+        cromwell_url = utils.fix_url(cromwell_url)
         auth = cromwell.get_cromwell_auth(url=cromwell_url)
         cromwell.validate_cromwell_server(auth)
 
@@ -211,7 +208,7 @@ def main():
                                          optional_cols=optional_cols,
                                          num_samples=num_samples)
 
-    # Replace columns in template sample sheet with actual workflow outputs
+    # Replace columns in template sample sheet with outputs imported from previous workflow batch
     if wf_outputs:
         wf_outputs = pd.DataFrame(wf_outputs)
         for col in wf_outputs.columns:
