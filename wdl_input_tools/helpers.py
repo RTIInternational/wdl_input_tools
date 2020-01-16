@@ -4,6 +4,7 @@ import json
 import numpy as np
 import string
 import re
+import uuid
 
 
 def configure_logging(verbosity):
@@ -57,3 +58,7 @@ def make_cromwell_compat_string(s):
 
 def fix_url(http):
     return "http://" + http.rpartition('/')[-1]
+
+
+def get_unique_id():
+    return str(uuid.uuid1())[0:7]
