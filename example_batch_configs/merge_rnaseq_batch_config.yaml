@@ -3,6 +3,7 @@ input_template:
 
     "## Sample attributes": "",
     "merge_rnaseq_samples_wf.sample_names": "$$$cromwell-sample-label",
+    "merge_rnaseq_samples_wf.wf_id": "$$$cromwell-workflow-id",
     "merge_rnaseq_samples_wf.sample_batch_names": "$$$cromwell-batch-sample-label",
     "merge_rnaseq_samples_wf.multiqc_input_dirs": "@@@rnaseq_pe_wf.multiqc_input_dir",
     "merge_rnaseq_samples_wf.salmon_quant_dirs": "@@@rnaseq_pe_wf.salmon_quant_dir",
