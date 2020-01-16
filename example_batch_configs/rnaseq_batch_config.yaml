@@ -32,12 +32,4 @@ sample_id_col: rnaseq_pe_wf.sample_name
 
 sample_sheet_validators: [validate_ss_against_wdl_template]
 
-merge_json:
-  '
-  merge_rnaseq_samples_wf.sample_names: "",
-  merge_rnaseq_samples_wf.multiqc_input_dirs: "<<rnaseq_pe_wf.salmon_quant_dir>>",
-  merge_rnaseq_samples_wf.salmon_quant_dirs: "<<rnaseq_pe_wf.multiqc_input_dir>>",
-  '
-
-
-
+wf_type: scatter
