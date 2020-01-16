@@ -14,7 +14,7 @@ import wdl_input_tools.contants as const
 class BatchConfig:
     # Class for reading and loading batch configuration options from a yaml config file
 
-    REQUIRED_KEYS = ["input_template", "sample_id_col", "sample_sheet_validators"]
+    REQUIRED_KEYS = ["input_template", "sample_id_col", "sample_sheet_validators", "wf_type"]
     BASE_VALIDATION_FUNC = "validate_ss_against_wdl_template"
 
     def __init__(self, batch_config_yaml):
@@ -47,8 +47,13 @@ class BatchConfig:
         for key in self.REQUIRED_KEYS:
             if key not in self.batch_config:
                 logging.error("Workflow batch missing required key: {0}".format(key))
+
+        if self.batch_config["wf_type"] not in ["scatter", "gather"]:
+            logging.error("Batch config wf_type must be either 'scatter' or 'gather'!")
+            errors = True
+
         if errors:
-            err_msg = "One or more required keys missing from batch config! See errors above for details."
+            err_msg = "One or more required keys missing or misspecified in batch config! See errors above for details."
             logging.error(err_msg)
             raise IOError(err_msg)
 
@@ -92,6 +97,9 @@ class BatchConfig:
 class WDLInputTemplate:
     # Class for holding the WDL JSON input file that will be used as a template
     # to generate batch input JSONs from a sample sheet
+    BATCH_OUTPUT_TOKEN = "@@@"
+    BATCH_LABEL_TOKEN = "$$$"
+
     def __init__(self, wdl_input_template):
 
         self.wdl_input = json.loads(wdl_input_template, object_pairs_hook=OrderedDict)
@@ -105,16 +113,67 @@ class WDLInputTemplate:
         self.cols = [key for key in self.wdl_input if key.startswith(self.workflow_name)]
 
         # Get required columns that need to be input from sample sheet
-        self.required_cols = [key for key, val in self.wdl_input.items() if key.startswith(self.workflow_name) and val == ""]
+        self.required_cols = [key for key, val in self.wdl_input.items() if self.is_required_col(key, val)]
         logging.info("Columns that must be specified in sample sheet:\n{0}".format(", ".join(self.required_cols)))
 
         # Optional cols
         self.optional_cols = [key for key in self.wdl_input if key.startswith(self.workflow_name) and key not in self.required_cols]
 
+        # Special columns that point to inputs and labels from previous batch workflows
+        # This is mainly used for merge/gather workflows to pass inputs from upstream workflows to the template
+        self.batch_output_cols = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.is_batch_output_col(v)}
+        self.batch_label_cols  = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.is_batch_label_col(v)}
+
+        self.validate()
+
+    @property
+    def imports_from_batch(self):
+        return len(self.batch_label_cols) + len(self.batch_output_cols) > 0
+
+    @property
+    def batch_import_keys(self):
+        return [k for k in self.batch_label_cols] + [k for k in self.batch_output_cols]
+
+    def validate(self):
+        # Make sure there are required columns. Otherwise what's the point of a template?
         if not self.required_cols:
             err_msg = "WDL template JSON must have at least one empty value that needs to be filled by sample sheet!"
             logging.error(err_msg)
             raise IOError(err_msg)
+
+        # Check to make sure all batch label values are valid batch labels
+        errors = False
+        for key, val in self.batch_label_cols.items():
+            if val not in const.REQUIRED_WF_LABELS:
+                logging.error("Invalid batch label value {0} in WDL template!".format(val))
+                errors = True
+        if errors:
+            err_msg = "One or more batch labels specified in WDL template is not an actual batch label!" \
+                      "\nLabel options: {0}".format(", ".join(const.REQUIRED_WF_LABELS))
+            logging.error(err_msg)
+            raise IOError(err_msg)
+
+    def is_required_col(self, key, val):
+        if not key.startswith(self.workflow_name):
+            return False
+        elif not isinstance(val, str):
+            return False
+        if val == "" or self.is_batch_label_col(val) or self.is_batch_output_col(val):
+            return True
+        return False
+
+    def is_batch_output_col(self, val):
+        if not isinstance(val, str):
+            return False
+        return val.startswith(self.BATCH_OUTPUT_TOKEN)
+
+    def is_batch_label_col(self, val):
+        if not isinstance(val, str):
+            return False
+        return val.startswith(self.BATCH_LABEL_TOKEN)
+
+    def get_batch_val(self, val):
+        return val.replace(self.BATCH_LABEL_TOKEN, "").replace(self.BATCH_OUTPUT_TOKEN, "")
 
     def get_wf_name(self):
         # Return name of workflow guess from WDL input JSON
@@ -166,7 +225,7 @@ class InputSampleSheet:
             raise IOError(err_msg)
 
 
-def init_sample_sheet_file(wdl_template, output_file, optional_cols=[], num_samples=1):
+def init_sample_sheet(wdl_template, optional_cols=[], num_samples=1):
     # Create an empty excel spreadsheet for user to fill in values to input to workflow
     cols_2_include = wdl_template.required_cols
 
@@ -194,7 +253,7 @@ def init_sample_sheet_file(wdl_template, output_file, optional_cols=[], num_samp
 
     data = {k: [v] * num_samples for k, v in wdl_template.wdl_input.items() if k in cols_2_include}
     df = pd.DataFrame(data)
-    df.to_excel(output_file, index=False)
+    return df
 
 
 def make_batch_inputs(sample_sheet, wdl_template):
