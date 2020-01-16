@@ -194,6 +194,10 @@ def main():
     with open(batch_label_json, "r") as fh:
         batch_labels = json.load(fh)
 
+    # Convert inputs/lables to lists if they're not already lists
+    batch_inputs = [batch_inputs] if not isinstance(batch_inputs, list) else batch_inputs
+    batch_labels = [batch_labels] if not isinstance(batch_labels, list) else batch_labels
+
     assert len(batch_inputs) == len(batch_labels), "Batch label and input files are different sizes!"
 
     # Check to make sure all workflow labels have required label keys
