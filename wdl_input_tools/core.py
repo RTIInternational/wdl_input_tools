@@ -192,6 +192,12 @@ class WDLInputTemplate:
         key = "{0}.{1}".format(self.workflow_name, key) if not key.startswith(self.workflow_name) else key
         return key
 
+    def make_wf_input(self, required_vals):
+        input_dict = self.get_template()
+        for col in required_vals:
+            input_dict[col] = required_vals[col]
+        return input_dict
+
 
 class InputSampleSheet:
     # Class for representing a set of sample information that will be used as input to a
@@ -258,20 +264,6 @@ def init_sample_sheet(wdl_template, optional_cols=[], num_samples=1):
     data = {k: [v] * num_samples for k, v in wdl_template.wdl_input.items() if k in cols_2_include}
     df = pd.DataFrame(data)
     return df
-
-
-def make_batch_inputs(sample_sheet, wdl_template):
-    # Create a runnable WDL JSON input file from a sample sheet and WDL template
-    batch_inputs = []
-    sample_sheet = sample_sheet.sample_sheet if isinstance(sample_sheet, InputSampleSheet) else sample_sheet
-
-    # Create a new template from each sample and plug in values from samplesheet
-    for i in range(len(sample_sheet)):
-        batch_input = wdl_template.get_template()
-        for col in sample_sheet.columns:
-            batch_input[col] = sample_sheet[col][i]
-        batch_inputs.append(batch_input)
-    return batch_inputs
 
 
 def get_wf_labels(sample_name, batch_name, workflow_name):

@@ -130,25 +130,44 @@ def main():
         logging.error(err_msg)
         raise IOError(err_msg)
 
+    # Convert sample sheet to WDL json inputs
+    wdl_template = batch_config.batch_wdl_template
+    wf_name = wdl_template.workflow_name
+
+    if batch_config.wf_type == "scatter":
+        # Scatter workflows convert ss to list of jsons where each row is input to separate wf (e.g. RNAseq wf)
+        logging.info("Generating workflow inputs json...")
+        ss_inputs = sample_sheet.sample_sheet.to_dict(orient="records")
+        inputs_json = [wdl_template.make_wf_input(ss_input) for ss_input in ss_inputs]
+        logging.info("Generating workflow labels json...")
+        labels_json = [wdl.get_wf_labels(sample, batch_name, wf_name) for sample in sample_sheet.sample_names]
+
+    elif batch_config.wf_type == "gather":
+        # Gather workflows convert ss to single json
+        # Each column passed to one wf key as a list (e.g. merge RNAseq wf)
+        logging.info("Generating workflow inputs json...")
+        inputs_json = sample_sheet.sample_sheet.to_dict(orient="list")
+        inputs_json = wdl_template.make_wf_input(inputs_json)
+        logging.info("Generating workflow labels json...")
+        labels_json = wdl.get_wf_labels(batch_name, batch_name, wf_name)
+
     # Write batch output files
     batch_inputs_file = "{0}.inputs.json".format(output_prefix)
     batch_labels_file = "{0}.labels.json".format(output_prefix)
     batch_status_file = "{0}.batch_report.xlsx".format(output_prefix)
 
-    # Write batch input json
-    logging.info("Making JSON input file for batch...")
-    inputs_json = wdl.make_batch_inputs(sample_sheet, batch_config.batch_wdl_template)
+    # Write batch inputs to json file
     with open(batch_inputs_file, "w") as fh:
         json.dump(inputs_json, fh, indent=1, cls=utils.NpEncoder)
 
-    # Write batch label json
-    logging.info("Making JSON label file for batch...")
-    labels_json = wdl.make_batch_labels(sample_sheet, batch_config.batch_wdl_template, batch_name)
+    # Write batch label json file
     with open(batch_labels_file, "w") as fh:
         json.dump(labels_json, fh, indent=1, cls=utils.NpEncoder)
 
     # Write batch status sheet
     logging.info("Making cromwell status sheet for batch...")
+    if batch_config.wf_type == "gather":
+        labels_json = {k: [v] for k,v in labels_json.items()}
     status_df = pd.DataFrame(data=labels_json)
     status_df.to_excel(batch_status_file, index=False)
 
