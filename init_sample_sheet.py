@@ -2,7 +2,6 @@ import argparse
 import os
 import logging
 import sys
-import numpy as np
 import pandas as pd
 
 from cromwell_tools.cromwell_api import CromwellAPI
