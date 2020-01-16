@@ -1,5 +1,4 @@
 import pandas as pd
-import uuid
 import logging
 import json
 import copy
@@ -9,6 +8,7 @@ import yaml
 
 import wdl_input_tools.validate as validate
 import wdl_input_tools.contants as const
+import wdl_input_tools.helpers as utils
 
 
 class BatchConfig:
@@ -41,6 +41,10 @@ class BatchConfig:
 
         # Get the name of the key that is to be used as the sample id in the WDL template
         self.sample_id_col = self.batch_config["sample_id_col"]
+
+        # Workflow type (scatter or gather)
+        # Specifies how sample sheet will be interpreted and output to json for WDL input
+        self.wf_type = self.batch_config["wf_type"]
 
     def validate(self):
         errors = False
@@ -270,22 +274,16 @@ def make_batch_inputs(sample_sheet, wdl_template):
     return batch_inputs
 
 
-def make_batch_labels(sample_sheet, wdl_template, batch_id):
-    # Create a runnable WDL JSON label file from a sample sheet and WDL template
-    batch_labels = []
-
-    # Create a set of unique labels for each sample
-    for sample_name in sample_sheet.sample_names:
-        batch_label = {const.CROMWELL_BATCH_LABEL: batch_id,
-                       const.CROMWELL_SAMPLE_LABEL: sample_name,
-                       const.CROMWELL_BATCH_SAMPLE_LABEL: "{0}_{1}".format(batch_id, sample_name),
-                       const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG,
-                       const.CROMWELL_UNIQUE_LABEL: "{0}_{1}_{2}_{3}".format(wdl_template.workflow_name,
-                                                                             batch_id,
-                                                                             sample_name,
-                                                                             str(uuid.uuid1())[0:7])}
-        batch_labels.append(batch_label)
-    return batch_labels
+def get_wf_labels(sample_name, batch_name, workflow_name):
+    label = {const.CROMWELL_BATCH_LABEL: batch_name,
+             const.CROMWELL_SAMPLE_LABEL: sample_name,
+             const.CROMWELL_BATCH_SAMPLE_LABEL: "{0}_{1}".format(batch_name, sample_name),
+             const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG,
+             const.CROMWELL_UNIQUE_LABEL: "{0}_{1}_{2}_{3}".format(workflow_name,
+                                                                   batch_name,
+                                                                   sample_name,
+                                                                   utils.get_unique_id())}
+    return label
 
 
 def validate_wf_labels(wf_labels):
