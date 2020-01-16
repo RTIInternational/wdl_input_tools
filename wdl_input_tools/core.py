@@ -144,7 +144,7 @@ class WDLInputTemplate:
         # Check to make sure all batch label values are valid batch labels
         errors = False
         for key, val in self.batch_label_cols.items():
-            if val not in const.REQUIRED_WF_LABELS:
+            if val not in const.REQUIRED_WF_LABELS + [const.CROMWELL_WF_ID_FIELD]:
                 logging.error("Invalid batch label value {0} in WDL template!".format(val))
                 errors = True
         if errors:
