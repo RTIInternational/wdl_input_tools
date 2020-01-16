@@ -102,7 +102,10 @@ def main():
     report_df = pd.DataFrame(data=wf_summaries)
 
     # Reorder columns in a standard order
-    report_df = report_df[const.STATUS_COL_ORDER]
+    # Remove columns if they don't exist in df
+    # e.g. - if you just submitted a batch and none have finished, 'end' won't be a label in the df
+    col_order = [x for x in const.STATUS_COL_ORDER if x in report_df.columns]
+    report_df = report_df[col_order]
 
     num_samples = len(report_df[const.CROMWELL_SAMPLE_LABEL].unique())
     num_success = len(report_df[report_df[const.CROMWELL_STATUS_FIELD] == const.CROMWELL_SUCCESS_STATUS][const.CROMWELL_SAMPLE_LABEL].unique())
