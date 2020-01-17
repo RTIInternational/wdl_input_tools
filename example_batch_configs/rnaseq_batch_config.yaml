@@ -24,7 +24,7 @@ input_template:
 
     "## Other parameters": "",
     "rnaseq_pe_wf.trim_headcrop_len": 3,
-    "rnaseq_pe_wf.regtools_strand_specificity": 0
+    "rnaseq_pe_wf.regtools_strand_specificity": 0,
     "rnaseq_pe_wf.trim_min_len": 75
 
   }'
