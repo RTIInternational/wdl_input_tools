@@ -101,8 +101,9 @@ class BatchConfig:
 class WDLInputTemplate:
     # Class for holding the WDL JSON input file that will be used as a template
     # to generate batch input JSONs from a sample sheet
-    BATCH_OUTPUT_TOKEN = "@@@"
-    BATCH_LABEL_TOKEN = "$$$"
+    BATCH_OUTPUT_TOKEN = "<<<IMPORT_WF_OUTPUT>>>"
+    BATCH_INPUT_TOKEN = "<<<IMPORT_WF_INPUT>>>"
+    BATCH_LABEL_TOKEN = "<<<IMPORT_WF_LABEL>>>"
 
     def __init__(self, wdl_input_template):
 
@@ -125,18 +126,19 @@ class WDLInputTemplate:
 
         # Special keys for when workflow inputs must come from a previous batch workflow
         # This is mainly used for merge/gather workflows to pass inputs from upstream workflows to the template
-        self.batch_output_cols = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.is_batch_output_col(v)}
-        self.batch_label_cols  = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.is_batch_label_col(v)}
+        self.batch_input_cols  = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.get_input_type(v) == "input"}
+        self.batch_output_cols = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.get_input_type(v) == "output"}
+        self.batch_label_cols  = {k: self.get_batch_val(v) for k,v in self.wdl_input.items() if self.get_input_type(v) == "label"}
 
         self.validate()
 
     @property
-    def imports_from_batch(self):
-        return len(self.batch_label_cols) + len(self.batch_output_cols) > 0
+    def imports_from_previous_batch(self):
+        return len(self.batch_label_cols) + len(self.batch_output_cols) + len(self.batch_input_cols) > 0
 
     @property
     def batch_import_keys(self):
-        return [k for k in self.batch_label_cols] + [k for k in self.batch_output_cols]
+        return [k for k in self.batch_label_cols] + [k for k in self.batch_output_cols] + [k for k in self.batch_input_cols]
 
     def validate(self):
         # Make sure there are required columns. Otherwise what's the point of a template?
@@ -162,22 +164,24 @@ class WDLInputTemplate:
             return False
         elif not isinstance(val, str):
             return False
-        if val == "" or self.is_batch_label_col(val) or self.is_batch_output_col(val):
+        if val == "" or self.get_input_type(val) is not None:
             return True
         return False
 
-    def is_batch_output_col(self, val):
+    def get_input_type(self, val):
         if not isinstance(val, str):
-            return False
-        return val.startswith(self.BATCH_OUTPUT_TOKEN)
-
-    def is_batch_label_col(self, val):
-        if not isinstance(val, str):
-            return False
-        return val.startswith(self.BATCH_LABEL_TOKEN)
+            return None
+        if val.startswith(self.BATCH_INPUT_TOKEN):
+            return "input"
+        elif val.startswith(self.BATCH_OUTPUT_TOKEN):
+            return "output"
+        elif val.startswith(self.BATCH_LABEL_TOKEN):
+            return "label"
+        else:
+            return None
 
     def get_batch_val(self, val):
-        return val.replace(self.BATCH_LABEL_TOKEN, "").replace(self.BATCH_OUTPUT_TOKEN, "")
+        return val.replace(self.BATCH_LABEL_TOKEN, "").replace(self.BATCH_OUTPUT_TOKEN, "").replace(self.BATCH_INPUT_TOKEN, "").strip()
 
     def get_wf_name(self):
         # Return name of workflow guess from WDL input JSON
@@ -197,6 +201,9 @@ class WDLInputTemplate:
         for col in required_vals:
             input_dict[col] = required_vals[col]
         return input_dict
+
+    def get_input_val(self, key):
+        return self.wdl_input[key]
 
 
 class InputSampleSheet:
@@ -261,9 +268,7 @@ def init_sample_sheet(wdl_template, optional_cols=[], num_samples=1):
         logging.error(err_msg)
         raise IOError(err_msg)
 
-    data = {k: [v] * num_samples for k, v in wdl_template.wdl_input.items() if k in cols_2_include}
-    df = pd.DataFrame(data)
-    return df
+    return {k: [v] * num_samples for k, v in wdl_template.wdl_input.items() if k in cols_2_include}
 
 
 def get_wf_labels(sample_name, batch_name, workflow_name):

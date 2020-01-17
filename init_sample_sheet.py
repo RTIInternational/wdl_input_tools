@@ -3,8 +3,6 @@ import logging
 import sys
 import pandas as pd
 
-from cromwell_tools.cromwell_api import CromwellAPI
-
 import wdl_input_tools.helpers as utils
 import wdl_input_tools.core as wdl
 import wdl_input_tools.cromwell as cromwell
@@ -76,70 +74,17 @@ def get_argparser():
     return argparser_obj
 
 
-def import_workflow_inputs(auth, batch_name, wdl_template):
-    # Import workflow outputs specified in WDLTemplate to current workflow
-
-    # Get workflows in batch
-    query = {"label": {const.CROMWELL_BATCH_LABEL: batch_name,
+def get_batch_wfs(prior_batch_name, auth):
+    # Get workflows in batch to import from
+    query = {"label": {const.CROMWELL_BATCH_LABEL: prior_batch_name,
                        const.CROMWELL_BATCH_STATUS_FIELD: const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG}}
     batch_wfs = cromwell.query_workflows(auth, query)
-
     # Raise error if no workflows found in batch
     if not batch_wfs:
-        err_msg = "Batch name '{0}' doesn't exist on cromwell server!".format(batch_name)
+        err_msg = "Batch name '{0}' doesn't exist on cromwell server!".format(prior_batch_name)
         logging.error(err_msg)
         raise IOError(err_msg)
-
-    # Get output files from each wf based on values specified in wf template
-    sample_names = []
-    wf_outputs = {key: [] for key in wdl_template.batch_import_keys}
-    for wf in batch_wfs:
-        metadata = CromwellAPI.metadata(wf, auth, includeKey=["outputs", "labels", "status"],
-                                        raise_for_status=True).json()
-        wf_status = metadata["status"]
-        sample_name = metadata["labels"][const.CROMWELL_SAMPLE_LABEL]
-
-        # Check to make sure sample name is unique in batch
-        if sample_name in sample_names:
-            err_msg = "Duplicate samples in batch: {0}! Samples must be unique. " \
-                      "Update batch status of non-unique sample runs!".format(sample_name)
-            logging.error(err_msg)
-            raise IOError(err_msg)
-
-        if wf_status != const.CROMWELL_SUCCESS_STATUS:
-            # Add null values for outputs from workflows that haven't or didn't succeed
-            # Let user decide what to do about these in the downstream sample sheet (exclude or rerun sample)
-            outputs = {key: "UNSUCCESSFUL/UNFINISHED WORKFLOW" for key in wdl_template.batch_output_cols}
-        else:
-            # Get output files from metadata using the keys specified in the WDL template
-            # E.g. @@@rnaseq_pe_wf.fastqc_file will look for an output with key 'rnaseq_pe_wf.fastqc_file'
-            try:
-                outputs = {key: metadata["outputs"][val] for key, val in wdl_template.batch_output_cols.items()}
-            except KeyError:
-                logging.error("Successful workflow '{0}' did not produce one "
-                              "or more outputs file keys specified in WDL template!".format(wf))
-                raise
-
-        # Get workflow labels specified in config
-        try:
-            labels = {key: metadata["labels"][val] for key, val in wdl_template.batch_label_cols.items()}
-        except KeyError:
-            logging.error("Successful workflow '{0}' did not have one "
-                          "or more workflow labels specified in WDL template!".format(wf))
-            raise
-
-        # Add output files from workflow to full set of output files
-        for wdl_template_key, wf_output in outputs.items():
-            wf_outputs[wdl_template_key].append(wf_output)
-
-        # Add labels from workflow to full set of labels
-        for wdl_template_key, wf_label in labels.items():
-            wf_outputs[wdl_template_key].append(wf_label)
-
-        # Add sample name to list of seen samples
-        sample_names.append(sample_name)
-
-    return wf_outputs
+    return batch_wfs
 
 
 def main():
@@ -154,7 +99,7 @@ def main():
     batch_config_file = args.batch_config_file
     ss_output = args.sample_sheet_file
     optional_cols = args.optional_cols
-    batch_name = args.batch_name
+    prior_batch_name = args.batch_name
     cromwell_url = args.cromwell_url
 
     # Configure logging appropriate for verbosity
@@ -164,12 +109,18 @@ def main():
     batch_config = wdl.BatchConfig(batch_config_file)
     wdl_template = batch_config.batch_wdl_template
 
-    # Authenticate to server and validate batch name
-    wf_outputs = {}
-    if wdl_template.imports_from_batch:
+    # Get additional columns to include
+    optional_cols = [x.strip() for x in optional_cols.split(",") if x != ""] if optional_cols != "ALL" else wdl_template.optional_cols
+    logging.debug("Optional columns: {0}".format(optional_cols))
+    if optional_cols:
+        logging.info("Optional columns to include: {0}".format(", ".join(optional_cols)))
+
+    # Initialize sample sheet that imports inputs from previous workflow batch
+    if wdl_template.imports_from_previous_batch:
         logging.info("WDL template detects inputs that should be imported from previous batch!")
+
         # Raise error if imports are required but no batch name or cromwell server given on command line
-        if batch_name is None or cromwell_url is None:
+        if prior_batch_name is None or cromwell_url is None:
             err_msg = "Must provide batch name and cromwell_url when WDL template imports from previous batch!"
             logging.error(err_msg)
             raise IOError(err_msg)
@@ -179,29 +130,50 @@ def main():
         auth = cromwell.get_cromwell_auth(url=cromwell_url)
         cromwell.validate_cromwell_server(auth)
 
-        # Grab outputs from batch workflows that match input keys specified in WDL template
-        wf_outputs = import_workflow_inputs(auth, batch_name, wdl_template)
+        # Get batch of workflows to import values from
+        import_wfs = get_batch_wfs(prior_batch_name, auth)
 
-    # Get additional columns to include
-    optional_cols = [x.strip() for x in optional_cols.split(",") if x != ""] if optional_cols != "ALL" else wdl_template.optional_cols
-    logging.debug("Optional columns: {0}".format(optional_cols))
+        # Init sample sheet with as many samples as batch
+        sample_sheet = wdl.init_sample_sheet(wdl_template,
+                                             optional_cols=optional_cols,
+                                             num_samples=len(import_wfs))
 
-    if optional_cols:
-        logging.info("Optional columns to include: {0}".format(", ".join(optional_cols)))
+        # Get columns in sample sheet that need to be imported from previous workflows
+        cols_to_import = {"inputs": wdl_template.batch_input_cols,
+                          "outputs": wdl_template.batch_output_cols,
+                          "labels": wdl_template.batch_label_cols}
 
-    # Initialize sample sheet
-    num_samples = 1 if not wf_outputs else len(pd.DataFrame(wf_outputs))
-    sample_sheet = wdl.init_sample_sheet(wdl_template,
-                                         optional_cols=optional_cols,
-                                         num_samples=num_samples)
+        # Populate sample sheet with values from imported workflows
+        for i in range(len(import_wfs)):
+            if i % 20 == 0:
+                logging.info("Processed {0} imported workflows...".format(i))
 
-    # Replace columns in template sample sheet with outputs imported from previous workflow batch
-    if wf_outputs:
-        wf_outputs = pd.DataFrame(wf_outputs)
-        for col in wf_outputs.columns:
-            sample_sheet[col] = wf_outputs[col]
+            # Get workflow data from cromwell server
+            wf = cromwell.BatchWorkflow(import_wfs[i], auth)
+            wf.sync_metadata()
 
-    # Write to excel
+            # Populate fields in sample sheet that need to be imported
+            for import_type, import_map in cols_to_import.items():
+                for curr_wf_key, import_wf_key in import_map.items():
+                    if import_type != "labels" and not wf.status == const.CROMWELL_SUCCESS_STATUS:
+                        import_val = "UNSUCCESSFUL/UNFINISHED WORKFLOW"
+                    else:
+                        import_val = utils.get_dict_val(wf.metadata[import_type],
+                                                        import_wf_key,
+                                                        err_msg="Imported workflow {0} does not have any {1} with "
+                                                                "required key: {2}".format(wf.wf_id,
+                                                                                           import_type,
+                                                                                           import_wf_key))
+                    # Set sample sheet value to value returned from imported workflow
+                    sample_sheet[curr_wf_key][i] = import_val
+
+    # Initialize sample sheet from WDL template only
+    else:
+        # Initialize sample sheet
+        sample_sheet = wdl.init_sample_sheet(wdl_template, optional_cols=optional_cols)
+
+    # Write sample sheet to excel
+    sample_sheet = pd.DataFrame(sample_sheet)
     sample_sheet.to_excel(ss_output, index=False)
 
     logging.info("Successfully initailized sample sheet to: {0}".format(ss_output))
