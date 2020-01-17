@@ -59,6 +59,10 @@ def get_argparser():
     return argparser_obj
 
 
+def get_status_count(report_df, status):
+    return len(report_df[report_df[const.CROMWELL_STATUS_FIELD] == status][const.CROMWELL_SAMPLE_LABEL])
+
+
 def main():
 
     # Configure argparser
@@ -93,8 +97,12 @@ def main():
 
     logging.info("Fetching workflow metadata...")
     wf_summaries = []
+    count = 0
     for batch_wf in batch_wfs:
         wf_summaries.append(cromwell.get_wf_summary(auth, batch_wf))
+        count += 1
+        if count % 20 == 0:
+            logging.info("Processed {0} workflows...".format(count))
 
     logging.info("Writing workflow report...")
     report_file = "{0}.batch_status.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
@@ -107,15 +115,20 @@ def main():
     col_order = [x for x in const.STATUS_COL_ORDER if x in report_df.columns]
     report_df = report_df[col_order]
 
-    num_samples = len(report_df[const.CROMWELL_SAMPLE_LABEL].unique())
-    num_success = len(report_df[report_df[const.CROMWELL_STATUS_FIELD] == const.CROMWELL_SUCCESS_STATUS][const.CROMWELL_SAMPLE_LABEL].unique())
-    logging.info("{0}/{1} ({2}%) samples in batch have completed successfully!".format(num_success,
-                                                                                       num_samples,
-                                                                                       (num_success/(1.0*num_samples))*100))
+    # Report status of samples in current active batch (batch_status = include)
+    active_report_df = report_df[report_df[const.CROMWELL_BATCH_STATUS_FIELD] == const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG]
+    num_samples = len(active_report_df)
 
-    # Remove workflows not in active batch unless otherwise specified
+    for status in const.WF_STATUS_VALS:
+        status_count = get_status_count(active_report_df, status)
+        logging.info("{0}/{1} ({2}%) samples {3} in active batch!".format(status_count,
+                                                                          num_samples,
+                                                                          (status_count / (1.0 * num_samples)) * 100,
+                                                                          status))
+
+    # Only report workflows in active batch unless otherwise specified
     if not show_excluded:
-        report_df = report_df[report_df[const.CROMWELL_BATCH_STATUS_FIELD] == const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG]
+        report_df = active_report_df
 
     # Sort by sample name
     report_df = report_df.sort_values(by=const.CROMWELL_SAMPLE_LABEL)
