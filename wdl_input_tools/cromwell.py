@@ -184,8 +184,6 @@ class BatchWorkflow:
         self.auth = cromwell_auth
         self.metadata = None
 
-
-
     def sync_metadata(self):
         self.metadata = CromwellAPI.metadata(self.wf_id,
                                         self.auth,
