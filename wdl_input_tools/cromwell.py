@@ -143,7 +143,7 @@ def get_wf_summary(cromwell_auth, wf_id):
     return metadata
 
 
-def submit_wf_from_dict(auth, wdl_workflow, input_dict, dependencies=None, label_dict=None):
+def submit_wf_from_dict(cromwell_auth, wdl_workflow, input_dict, dependencies=None, label_dict=None):
 
     # Write input and label files to tmp files
     input_file = tempfile.NamedTemporaryFile()
@@ -159,7 +159,7 @@ def submit_wf_from_dict(auth, wdl_workflow, input_dict, dependencies=None, label
 
     try:
         # Submit workflow and return id
-        result = CromwellAPI.submit(auth,
+        result = CromwellAPI.submit(cromwell_auth,
                                     wdl_workflow,
                                     input_file.name,
                                     dependencies=dependencies,
@@ -172,3 +172,46 @@ def submit_wf_from_dict(auth, wdl_workflow, input_dict, dependencies=None, label
         input_file.close()
         if label_dict:
             label_file.close()
+
+
+def get_wf_inputs(cromwell_auth, wf_id):
+    return get_wf_metadata(cromwell_auth, wf_id, include_keys="inputs")["inputs"]
+
+
+class BatchWorkflow:
+    def __init__(self, wf_id, cromwell_auth):
+        self.wf_id = wf_id
+        self.auth = cromwell_auth
+        self.metadata = None
+
+
+
+    def sync_metadata(self):
+        self.metadata = CromwellAPI.metadata(self.wf_id,
+                                        self.auth,
+                                        includeKey=["outputs", "labels", "status", "inputs"],
+                                        raise_for_status=True).json()
+
+    @property
+    def sample_name(self):
+        return self.metadata["labels"][const.CROMWELL_SAMPLE_LABEL]
+
+    @property
+    def batch_name(self):
+        return self.metadata["labels"][const.CROMWELL_BATCH_LABEL]
+
+    @property
+    def batch_status(self):
+        return self.metadata["labels"][const.CROMWELL_BATCH_STATUS_FIELD]
+
+    @property
+    def inputs(self):
+        return self.metadata["inputs"]
+
+    @property
+    def outputs(self):
+        return self.metadata["outputs"]
+
+    @property
+    def status(self):
+        return self.metadata["status"]
