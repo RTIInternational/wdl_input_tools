@@ -1,36 +1,25 @@
 import argparse
-import os
 import logging
 import sys
 import pandas as pd
 import json
+import time
+import shutil
 
 import wdl_input_tools.core as wdl
 import wdl_input_tools.cromwell as cromwell
 import wdl_input_tools.helpers as utils
+import wdl_input_tools.cli as cli
 
 
 def get_argparser():
     # Configure and return argparser object for reading command line arguments
     argparser_obj = argparse.ArgumentParser(prog="make_batch_inputs")
 
-    def file_type(arg_string):
-        """
-        This function check both the existance of input file and the file size
-        :param arg_string: file name as string
-        :return: file name as string
-        """
-        if not os.path.exists(arg_string):
-            err_msg = "%s does not exist! " \
-                      "Please provide a valid file!" % arg_string
-            raise argparse.ArgumentTypeError(err_msg)
-
-        return arg_string
-
     # Path to batch config file
     argparser_obj.add_argument("--batch-config",
                                action="store",
-                               type=file_type,
+                               type=cli.file_type_arg,
                                dest="batch_config_file",
                                required=True,
                                help="Path to batch config yaml file")
@@ -38,7 +27,7 @@ def get_argparser():
     # Path to sample sheet excel file
     argparser_obj.add_argument("--sample-sheet",
                                action="store",
-                               type=file_type,
+                               type=cli.file_type_arg,
                                dest="sample_sheet_file",
                                required=True,
                                help="Path to sample sheet that will be used to populate WDL template")
@@ -46,7 +35,7 @@ def get_argparser():
     # Batch name to be associated with all workflows
     argparser_obj.add_argument("--batch-name",
                                action="store",
-                               type=str,
+                               type=cli.batch_type_arg,
                                dest="batch_name",
                                required=True,
                                help="Name to associate with batch of workflows")
@@ -54,7 +43,7 @@ def get_argparser():
     # Output prefix
     argparser_obj.add_argument("--output-prefix",
                                action="store",
-                               type=str,
+                               type=cli.prefix_type_arg,
                                dest="output_prefix",
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")
@@ -152,9 +141,11 @@ def main():
         labels_json = wdl.get_wf_labels(batch_name, batch_name, wf_name)
 
     # Write batch output files
-    batch_inputs_file = "{0}.inputs.json".format(output_prefix)
-    batch_labels_file = "{0}.labels.json".format(output_prefix)
-    batch_status_file = "{0}.batch_report.xlsx".format(output_prefix)
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    batch_inputs_file = "{0}.inputs.{1}.json".format(output_prefix, timestamp)
+    batch_labels_file = "{0}.labels.{1}.json".format(output_prefix, timestamp)
+    batch_status_file = "{0}.batch_report.{1}.xlsx".format(output_prefix, timestamp)
+    batch_config_record_file = "{0}.make_batch.config.{1}.yaml".format(output_prefix, timestamp)
 
     # Write batch inputs to json file
     with open(batch_inputs_file, "w") as fh:
@@ -170,6 +161,9 @@ def main():
         labels_json = {k: [v] for k,v in labels_json.items()}
     status_df = pd.DataFrame(data=labels_json)
     status_df.to_excel(batch_status_file, index=False)
+
+    # Write record of batch config so we know how this set of inputs was created
+    shutil.copy(batch_config_file, batch_config_record_file)
 
 
 if __name__ == "__main__":

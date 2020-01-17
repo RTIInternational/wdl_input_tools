@@ -1,5 +1,4 @@
 import argparse
-import os
 import logging
 import sys
 import pandas as pd
@@ -10,29 +9,17 @@ import wdl_input_tools.helpers as utils
 import wdl_input_tools.core as wdl
 import wdl_input_tools.cromwell as cromwell
 import wdl_input_tools.contants as const
+import wdl_input_tools.cli as cli
 
 
 def get_argparser():
     # Configure and return argparser object for reading command line arguments
     argparser_obj = argparse.ArgumentParser(prog="init_batch_sample_sheet")
 
-    def file_type(arg_string):
-        """
-        This function check both the existance of input file and the file size
-        :param arg_string: file name as string
-        :return: file name as string
-        """
-        if not os.path.exists(arg_string):
-            err_msg = "%s does not exist! " \
-                      "Please provide a valid file!" % arg_string
-            raise argparse.ArgumentTypeError(err_msg)
-
-        return arg_string
-
     # Path to batch config file that defines input template, validation classes, and merge instructions
     argparser_obj.add_argument("--batch-config",
                                action="store",
-                               type=file_type,
+                               type=cli.file_type_arg,
                                dest="batch_config_file",
                                required=True,
                                help="Path to batch config file")
@@ -40,7 +27,7 @@ def get_argparser():
     # Output path where sample sheet template will be written
     argparser_obj.add_argument("--sample-sheet",
                                action="store",
-                               type=str,
+                               type=cli.excel_type_arg,
                                dest="sample_sheet_file",
                                required=True,
                                help="Path to output file where sample sheet will be initialized")
@@ -59,7 +46,7 @@ def get_argparser():
     # Batch name to be associated with all workflows
     argparser_obj.add_argument("--populate-from-batch",
                                action="store",
-                               type=str,
+                               type=cli.batch_type_arg,
                                dest="batch_name",
                                required=False,
                                help="Name to batch to pull workflow inputs from if WF inputs required by WDL template")

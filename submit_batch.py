@@ -14,29 +14,17 @@ import wdl_input_tools.helpers as utils
 import wdl_input_tools.core as wdl
 import wdl_input_tools.cromwell as cromwell
 import wdl_input_tools.contants as const
+import wdl_input_tools.cli as cli
 
 
 def get_argparser():
     # Configure and return argparser object for reading command line arguments
     argparser_obj = argparse.ArgumentParser(prog="submit_batch")
 
-    def file_type(arg_string):
-        """
-        This function check both the existance of input file and the file size
-        :param arg_string: file name as string
-        :return: file name as string
-        """
-        if not os.path.exists(arg_string):
-            err_msg = "%s does not exist! " \
-                      "Please provide a valid file!" % arg_string
-            raise argparse.ArgumentTypeError(err_msg)
-
-        return arg_string
-
     # Path to json containing batch wdl inputs
     argparser_obj.add_argument("--inputs",
                                action="store",
-                               type=file_type,
+                               type=cli.file_type_arg,
                                dest="input_json",
                                required=True,
                                help="Path to batch JSON inputs")
@@ -44,7 +32,7 @@ def get_argparser():
     # Path to json containing batch wdl labels
     argparser_obj.add_argument("--labels",
                                action="store",
-                               type=file_type,
+                               type=cli.file_type_arg,
                                dest="label_json",
                                required=True,
                                help="Path to batch JSON label file")
@@ -52,7 +40,7 @@ def get_argparser():
     # Path to wdl workflow that will be run on each sample
     argparser_obj.add_argument("--wdl",
                                action="store",
-                               type=file_type,
+                               type=cli.file_type_arg,
                                dest="wdl_workflow",
                                required=True,
                                help="Path to wdl workflow to be executed on batch")
@@ -60,7 +48,7 @@ def get_argparser():
     # Path to zipped directory of wdl workflow dependencies
     argparser_obj.add_argument("--imports",
                                action="store",
-                               type=file_type,
+                               type=cli.file_type_arg,
                                dest="wdl_imports",
                                required=True,
                                help="Path to zipped WDL imports for wdl workflow")
@@ -68,7 +56,7 @@ def get_argparser():
     # Output prefix
     argparser_obj.add_argument("--output-prefix",
                                action="store",
-                               type=str,
+                               type=cli.prefix_type_arg,
                                dest="output_prefix",
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")

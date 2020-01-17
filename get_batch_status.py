@@ -7,16 +7,18 @@ import time
 import wdl_input_tools.helpers as utils
 import wdl_input_tools.cromwell as cromwell
 import wdl_input_tools.contants as const
+import wdl_input_tools.cli as cli
 
 
 def get_argparser():
+
     # Configure and return argparser object for reading command line arguments
     argparser_obj = argparse.ArgumentParser(prog="get_batch_status")
 
     # Name of batch from which to fetch status updates
     argparser_obj.add_argument("--batch-name",
                                action="store",
-                               type=str,
+                               type=cli.batch_type_arg,
                                dest="batch_name",
                                required=True,
                                help="Batch name. Will return all workflows where cromwell-batch-name-label is this batch-name")
@@ -24,7 +26,7 @@ def get_argparser():
     # Output prefix for status output file
     argparser_obj.add_argument("--output-prefix",
                                action="store",
-                               type=str,
+                               type=cli.prefix_type_arg,
                                dest="output_prefix",
                                required=True,
                                help="Output prefix where batch input, label, and cromwell status output files will be generated.")
