@@ -2,6 +2,7 @@ import requests
 import logging
 import tempfile
 import json
+import re
 
 from cromwell_tools.cromwell_api import CromwellAPI
 from cromwell_tools.cromwell_auth import CromwellAuth
@@ -11,6 +12,11 @@ from wdl_input_tools import contants as const
 
 class WFStatusCheckFailException(BaseException):
     pass
+
+
+def is_valid_label(lab):
+    cromwell_label_regex = "^[a-zA-Z0-9]+[a-zA-Z0-9_-]*$"
+    return re.match(cromwell_label_regex, lab) is not None
 
 
 def get_cromwell_auth(url):
