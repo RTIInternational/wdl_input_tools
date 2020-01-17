@@ -24,12 +24,12 @@ def get_argparser():
                                help="Batch name. Will return all workflows where cromwell-batch-name-label is this batch-name")
 
     # Output prefix for status output file
-    argparser_obj.add_argument("--output-prefix",
+    argparser_obj.add_argument("--output-dir",
                                action="store",
-                               type=cli.prefix_type_arg,
-                               dest="output_prefix",
+                               type=cli.dir_type_arg,
+                               dest="output_dir",
                                required=True,
-                               help="Output prefix where batch input, label, and cromwell status output files will be generated.")
+                               help="Output directory for status report file")
 
     # Whether to show status of batch workflows excluded from the active batch (batch_status == excluded)
     argparser_obj.add_argument("--show-excluded",
@@ -75,7 +75,7 @@ def main():
 
     # Input files: json input file to be used as template and
     batch_name = args.batch_name
-    output_prefix = args.output_prefix
+    output_dir = args.output_dir
     show_excluded = args.show_excluded
     cromwell_url = args.cromwell_url
 
@@ -139,7 +139,9 @@ def main():
     report_df = report_df.sort_values(by=const.CROMWELL_SAMPLE_LABEL)
 
     # Write to separate files
-    report_file = "{0}.batch_status.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
+    report_file = "{0}/{1}.batch_status.{2}.xlsx".format(output_dir,
+                                                         batch_name,
+                                                         time.strftime("%Y%m%d-%H%M%S"))
     report_df.to_excel(report_file, index=False)
 
 

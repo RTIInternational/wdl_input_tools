@@ -16,8 +16,20 @@ def file_type_arg(arg_string):
         err_msg = "%s does not exist! " \
                   "Please provide a valid file!" % arg_string
         raise argparse.ArgumentTypeError(err_msg)
-
     return arg_string
+
+
+def dir_type_arg(arg_string):
+    err_msg = ""
+    if not os.path.exists(arg_string):
+        err_msg = "%s does not exist! " \
+                  "Please provide a valid directory!" % arg_string
+    elif not os.path.isdir(arg_string):
+        err_msg = "%s is not a directory! " \
+                  "Please provide a valid directory!" % arg_string
+    if err_msg:
+        raise argparse.ArgumentTypeError(err_msg)
+    return arg_string.rstrip("/")+"/"
 
 
 def excel_type_arg(arg_string):

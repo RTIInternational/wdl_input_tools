@@ -41,12 +41,12 @@ def get_argparser():
                                help="Name to associate with batch of workflows")
 
     # Output prefix
-    argparser_obj.add_argument("--output-prefix",
+    argparser_obj.add_argument("--output-dir",
                                action="store",
-                               type=cli.prefix_type_arg,
-                               dest="output_prefix",
+                               type=cli.dir_type_arg,
+                               dest="output_dir",
                                required=True,
-                               help="Output prefix where batch input, label, and cromwell status output files will be generated.")
+                               help="Output dir where batch input, label, and cromwell status output files will be generated.")
 
     # Option to override name-checking
     # If not specified, program will error out if batch_name is not unique to cromwell
@@ -90,7 +90,7 @@ def main():
     batch_config_file = args.batch_config_file
     ss_file  = args.sample_sheet_file
     batch_name = args.batch_name
-    output_prefix = args.output_prefix
+    output_dir = args.output_dir
     force_overwrite = args.force_overwrite
     cromwell_url = args.cromwell_url
 
@@ -142,9 +142,10 @@ def main():
 
     # Write batch output files
     timestamp = time.strftime("%Y%m%d-%H%M%S")
-    batch_inputs_file = "{0}.inputs.{1}.json".format(output_prefix, timestamp)
-    batch_labels_file = "{0}.labels.{1}.json".format(output_prefix, timestamp)
-    batch_status_file = "{0}.batch_report.{1}.xlsx".format(output_prefix, timestamp)
+    output_prefix = "{0}/{1}".format(output_dir, batch_name)
+    batch_inputs_file = "{0}.make_batch.inputs.{1}.json".format(output_prefix, timestamp)
+    batch_labels_file = "{0}.make_batch.labels.{1}.json".format(output_prefix, timestamp)
+    batch_status_file = "{0}.make_batch.report.{1}.xlsx".format(output_prefix, timestamp)
     batch_config_record_file = "{0}.make_batch.config.{1}.yaml".format(output_prefix, timestamp)
 
     # Write batch inputs to json file

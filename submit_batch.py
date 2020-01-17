@@ -1,5 +1,4 @@
 import argparse
-import os
 import logging
 import sys
 import json
@@ -54,12 +53,12 @@ def get_argparser():
                                help="Path to zipped WDL imports for wdl workflow")
 
     # Output prefix
-    argparser_obj.add_argument("--output-prefix",
+    argparser_obj.add_argument("--output-dir",
                                action="store",
                                type=cli.prefix_type_arg,
-                               dest="output_prefix",
+                               dest="output_dir",
                                required=True,
-                               help="Output prefix where batch input, label, and cromwell status output files will be generated.")
+                               help="Output dir for submit_batch report file")
 
     # Configure how to deal with batch conflicts (i.e. when a sample workflow has already been submitted/executed)
     # It's basically the re-run policy. On any given batch you can choose to re-run:
@@ -165,7 +164,7 @@ def main():
     batch_label_json = args.label_json
     wdl_workflow = args.wdl_workflow
     wdl_imports = args.wdl_imports
-    output_prefix = args.output_prefix
+    output_dir = args.output_dir
     batch_conflict_action = args.batch_conflict_action
     cromwell_url = args.cromwell_url
 
@@ -198,7 +197,10 @@ def main():
 
     # Create a report to detail what jobs were run/skipped/failed
     job_report = copy.deepcopy(batch_labels)
-    report_file = "{0}.submit_batch.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
+    batch_name = batch_labels[0][const.CROMWELL_BATCH_LABEL]
+    report_file = "{0}/{1}.submit_batch.{2}.xlsx".format(output_dir,
+                                                         batch_name,
+                                                         time.strftime("%Y%m%d-%H%M%S"))
 
     # Loop through workflows to see if they need to be run/rerun
     submitted_wfs = 0
