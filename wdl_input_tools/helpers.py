@@ -62,3 +62,11 @@ def fix_url(http):
 
 def get_unique_id():
     return str(uuid.uuid1())[0:7]
+
+
+def get_dict_val(my_dict, key, err_msg):
+    try:
+        return my_dict[key]
+    except KeyError:
+        logging.error(err_msg)
+        raise KeyError(err_msg)
