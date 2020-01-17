@@ -87,8 +87,13 @@ def main():
     auth = cromwell.get_cromwell_auth(url=cromwell_url)
     cromwell.validate_cromwell_server(auth)
 
-    # Otherwise just grab all of the workflows with batch-name
-    batch_wfs = cromwell.query_workflows(auth, {"label": {const.CROMWELL_BATCH_LABEL: batch_name}})
+    # Grab workflows from batch
+    query = {"label": {const.CROMWELL_BATCH_LABEL: batch_name}}
+    if not show_excluded:
+        # Optinally get only workflows in active batch (batch_status = include)
+        query["label"][const.CROMWELL_BATCH_STATUS_FIELD] = const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG
+        
+    batch_wfs = cromwell.query_workflows(auth, query)
 
     # Error out if batch doesn't actually exist
     if not batch_wfs:
