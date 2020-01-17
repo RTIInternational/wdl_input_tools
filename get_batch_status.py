@@ -92,7 +92,7 @@ def main():
     if not show_excluded:
         # Optinally get only workflows in active batch (batch_status = include)
         query["label"][const.CROMWELL_BATCH_STATUS_FIELD] = const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG
-        
+
     batch_wfs = cromwell.query_workflows(auth, query)
 
     # Error out if batch doesn't actually exist
@@ -118,20 +118,20 @@ def main():
     col_order = [x for x in const.STATUS_COL_ORDER if x in report_df.columns]
     report_df = report_df[col_order]
 
-    # Report status of samples in current active batch (batch_status = include)
-    active_report_df = report_df[report_df[const.CROMWELL_BATCH_STATUS_FIELD] == const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG]
-    num_samples = len(active_report_df)
-
-    for status in const.WF_STATUS_VALS:
-        status_count = get_status_count(active_report_df, status)
-        logging.info("{0}/{1} ({2}%) samples {3} in active batch!".format(status_count,
-                                                                          num_samples,
-                                                                          (status_count / (1.0 * num_samples)) * 100,
-                                                                          status))
-
-    # Only report workflows in active batch unless otherwise specified
+    # Report status of samples in either current active batch (batch_status = include) or all workflows in batch
+    report_type = "complete batch (include+exclude)"
     if not show_excluded:
-        report_df = active_report_df
+        report_df = report_df[report_df[const.CROMWELL_BATCH_STATUS_FIELD] == const.CROMWELL_BATCH_STATUS_INCLUDE_FLAG]
+        report_type = "active batch"
+
+    num_samples = len(report_df)
+    for status in const.WF_STATUS_VALS:
+        status_count = get_status_count(report_df, status)
+        logging.info("{0}/{1} ({2}%) samples {3} in {4}!".format(status_count,
+                                                                 num_samples,
+                                                                 (status_count / (1.0 * num_samples)) * 100,
+                                                                 status,
+                                                                 report_type))
 
     # Sort by sample name
     report_df = report_df.sort_values(by=const.CROMWELL_SAMPLE_LABEL)
