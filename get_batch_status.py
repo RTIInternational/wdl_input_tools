@@ -104,9 +104,7 @@ def main():
         if count % 20 == 0:
             logging.info("Processed {0} workflows...".format(count))
 
-    logging.info("Writing workflow report...")
-    report_file = "{0}.batch_status.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
-
+    logging.info("Creating workflow report...")
     report_df = pd.DataFrame(data=wf_summaries)
 
     # Reorder columns in a standard order
@@ -134,6 +132,7 @@ def main():
     report_df = report_df.sort_values(by=const.CROMWELL_SAMPLE_LABEL)
 
     # Write to separate files
+    report_file = "{0}.batch_status.{1}.xlsx".format(output_prefix, time.strftime("%Y%m%d-%H%M%S"))
     report_df.to_excel(report_file, index=False)
 
 
