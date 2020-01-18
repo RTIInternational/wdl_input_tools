@@ -55,7 +55,7 @@ def get_argparser():
     # Output prefix
     argparser_obj.add_argument("--output-dir",
                                action="store",
-                               type=cli.prefix_type_arg,
+                               type=cli.dir_type_arg,
                                dest="output_dir",
                                required=True,
                                help="Output dir for submit_batch report file")
@@ -69,13 +69,14 @@ def get_argparser():
                                action="store",
                                dest="batch_conflict_action",
                                type=str,
-                               choices=["rerun-all", "rerun-unless-success", "rerun-failed"],
+                               choices=["rerun-all", "rerun-unless-success", "rerun-unless-running", "rerun-failed"],
                                default="rerun-failed",
                                help="Action on batch conflict:\n"
                                     "rerun-failed = Only re-run samples if a previous wf failed\n"
+                                    "rerun-unless-running = Re-run failed or submitted samples that haven't run yet\n"
                                     "rerun-unless-success = Re-run sample unless previous wf succeeded. "
                                     "Aborts prior running/submitted workflows\n"
-                                    "rerun-all = Re-run all samples regardless of prior workflow success" )
+                                    "rerun-all = Re-run all samples regardless of prior workflow success\n")
 
     # Cromwell server IP address
     argparser_obj.add_argument("--cromwell-url",
@@ -120,6 +121,10 @@ def resolve_batch_conflict(auth, batch_conflict_wf, batch_conflict_action):
 
     # Do not overwrite running/pending/submitted workflows unless rerun-unless-success option specified
     elif batch_conflict_alive and batch_conflict_action == "rerun-failed":
+        can_overwrite_batch_conflict = False
+
+    # Do not overwrite running/successful workflows
+    elif batch_conflict_status == const.CROMWELL_RUNNING_STATUS and batch_conflict_action == "rerun-unless-running":
         can_overwrite_batch_conflict = False
 
     # Abort batch conflict workflow if it can be overwritten and is currently in a non-terminal state
