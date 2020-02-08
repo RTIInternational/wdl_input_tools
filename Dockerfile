@@ -4,7 +4,7 @@ FROM python:3.7.6-slim-stretch
 # Metadata
 LABEL base.image="wdl_input_tools:latest"
 LABEL version="1"
-LABEL software="QCParser"
+LABEL software="wdl_input_tools"
 LABEL software.version="latest"
 LABEL description="Bioinformatics utility for managing batch execution of WDL workflows through a Cromwell server"
 
@@ -15,11 +15,13 @@ MAINTAINER Alex Waldrop <awaldrop@rti.org>
 RUN apt-get update
 
 # install required dependencies for QCParser
-RUN pip install -r requirements.txt
+ADD requirements.txt .
+RUN pip install -r requirements.txt && rm requirements.txt
 
 # get the QCParser from GitHub
 RUN mkdir /opt/wdl_input_tools
-RUN ADD . /opt/wdl_input_tools
+ADD . /opt/wdl_input_tools
+RUN chmod 755 /opt/wdl_input_tools/*.py
 
 ENV PATH /opt/wdl_input_tools:$PATH
 
