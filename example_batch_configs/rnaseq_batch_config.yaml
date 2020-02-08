@@ -8,6 +8,7 @@ input_template:
     "rnaseq_pe_wf.read_len": 150,
     "rnaseq_pe_wf.is_phred33": true,
     "rnaseq_pe_wf.is_stranded": true,
+    "rnaseq_pe_wf.run_dexseq": true,
 
     "## Reference files": "",
     "rnaseq_pe_wf.adapters_fa": "s3://rti-common/rnaseq_refs/hg38/rnaseq_trimmomaic_adapters.fa",
