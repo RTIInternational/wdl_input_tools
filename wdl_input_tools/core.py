@@ -121,6 +121,10 @@ class WDLInputTemplate:
         self.required_cols = [key for key, val in self.wdl_input.items() if self.is_required_col(key, val)]
         logging.info("Columns that must be specified in sample sheet:\n{0}".format(", ".join(self.required_cols)))
 
+        # Determine if any required columns must be coerced to arrays
+        self.array_cols = [key for key,val in self.wdl_input.items() if key in self.required_cols and isinstance(val, list)]
+        logging.info("Required columns that will be coerced to arrays:\n{0}".format(", ".join(self.array_cols)))
+
         # Optional cols
         self.optional_cols = [key for key in self.wdl_input if key.startswith(self.workflow_name) and key not in self.required_cols]
 
@@ -161,8 +165,13 @@ class WDLInputTemplate:
 
     def is_required_col(self, key, val):
         if not key.startswith(self.workflow_name):
+            # Eliminate comments or things that don't start with workflow name
             return False
+        elif isinstance(val, list) and not len(val):
+            # Empty arrays are required values that must be coerced to arrays
+            return True
         elif not isinstance(val, str):
+            # Otherwise anything that's not a string is not a required value
             return False
         if val == "" or self.get_input_type(val) is not None:
             return True
@@ -199,7 +208,14 @@ class WDLInputTemplate:
     def make_wf_input(self, required_vals):
         input_dict = self.get_template()
         for col in required_vals:
-            input_dict[col] = required_vals[col]
+            val = required_vals[col]
+            # Coerce to list if workflow is expecting a list
+            if col in self.array_cols:
+                # Remove any brackets and quoting and slit out by comma into list
+                val = val.strip("[").strip("]").replace('"', '').replace("'", "").split(",")
+                # Remove any leading/trailing whitespace
+                val = [x.strip() for x in val]
+            input_dict[col] = val
         return input_dict
 
     def get_input_val(self, key):
