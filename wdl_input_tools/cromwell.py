@@ -143,7 +143,7 @@ def get_wf_summary(cromwell_auth, wf_id):
     return metadata
 
 
-def submit_wf_from_dict(cromwell_auth, wdl_workflow, input_dict, dependencies=None, label_dict=None):
+def submit_wf_from_dict(cromwell_auth, wdl_workflow, input_dict, dependencies=None, label_dict=None, options_file=None):
 
     # Write input and label files to tmp files
     input_file = tempfile.NamedTemporaryFile()
@@ -164,6 +164,7 @@ def submit_wf_from_dict(cromwell_auth, wdl_workflow, input_dict, dependencies=No
                                     input_file.name,
                                     dependencies=dependencies,
                                     label_file=label_file.name,
+                                    options_file=options_file,
                                     raise_for_status=True)
         return result.json()["id"]
 

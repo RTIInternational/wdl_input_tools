@@ -46,6 +46,15 @@ def get_argparser():
                                required=True,
                                help="Path to wdl workflow to be executed on batch")
 
+    # Path to wdl workflow options file that will be included with each submission
+    argparser_obj.add_argument("--options",
+                               action="store",
+                               type=cli.file_type_arg,
+                               dest="wdl_options",
+                               required=False,
+                               default=None,
+                               help="Path to wdl workflow options file to be included with each wf submission")
+
     # Path to zipped directory of wdl workflow dependencies
     argparser_obj.add_argument("--imports",
                                action="store",
@@ -171,6 +180,7 @@ def main():
     batch_label_json = args.label_json
     wdl_workflow = args.wdl_workflow
     wdl_imports = args.wdl_imports
+    wdl_options = args.wdl_options
     output_dir = args.output_dir
     batch_conflict_action = args.batch_conflict_action
     cromwell_url = args.cromwell_url
@@ -262,7 +272,8 @@ def main():
                                                      wdl_workflow,
                                                      input_dict=wf_input,
                                                      dependencies=wdl_imports,
-                                                     label_dict=wf_labels)
+                                                     label_dict=wf_labels,
+                                                     options_file=wdl_options)
 
                 # Increment counter of successfully submitted workflows
                 submitted_wfs += 1
