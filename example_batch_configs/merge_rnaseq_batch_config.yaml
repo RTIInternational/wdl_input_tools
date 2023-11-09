@@ -2,15 +2,15 @@ input_template:
   '{
 
     "## Sample attributes": "",
-    "merge_rnaseq_samples_wf.analysis_name": "hic_rnaseq",
-    "merge_rnaseq_samples_wf.multiqc.cpu": 8,
-    "merge_rnaseq_samples_wf.multiqc.mem_gb": 32,
+    "merge_rnaseq_samples_wf.analysis_name": "rnaseq_pe_wf_20231017",
+    "merge_rnaseq_samples_wf.multiqc.cpu": 16,
+    "merge_rnaseq_samples_wf.multiqc.mem_gb": 250,
+    "merge_rnaseq_samples_wf.annotation_gtf": "s3://rti-common/rnaseq_refs/hg38/gencode_v34/gencode.v34.primary_assembly.annotation.gtf",
     "merge_rnaseq_samples_wf.sample_names": "<<<IMPORT_WF_INPUT>>> rnaseq_pe_wf.sample_name",
     "merge_rnaseq_samples_wf.multiqc_input_dirs": "<<<IMPORT_WF_OUTPUT>>> rnaseq_pe_wf.multiqc_input_dir",
     "merge_rnaseq_samples_wf.salmon_quant_sf_files": "<<<IMPORT_WF_OUTPUT>>> rnaseq_pe_wf.salmon_quant_sf",
     "merge_rnaseq_samples_wf.multiqc_reports": "<<<IMPORT_WF_OUTPUT>>> rnaseq_pe_wf.multiqc_report"
-
-
+    
   }'
 
 sample_id_col: merge_rnaseq_samples_wf.sample_names
